@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, useRef } from 'react'
+import React, { Suspense, useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -30,46 +30,7 @@ interface Message {
   is_read: boolean
 }
 
-const MOCK_CONVERSATIONS: Conversation[] = [
-  {
-    id: 'user1',
-    username: 'algo_expert',
-    display_name: 'Algorithm Expert',
-    last_message: 'That binary search solution was perfect!',
-    last_message_time: '2 min ago',
-    unread_count: 1,
-    avatar_color: 'from-blue-500 to-cyan-500',
-  },
-  {
-    id: 'user2',
-    username: 'code_warrior',
-    display_name: 'Code Warrior',
-    last_message: 'Want to do a mock contest together?',
-    last_message_time: '15 min ago',
-    unread_count: 2,
-    avatar_color: 'from-purple-500 to-pink-500',
-  },
-  {
-    id: 'user3',
-    username: 'learning_dev',
-    display_name: 'Learning Dev',
-    last_message: 'Thanks for the DP tutorial!',
-    last_message_time: '1 hour ago',
-    unread_count: 0,
-    avatar_color: 'from-green-500 to-emerald-500',
-  },
-  {
-    id: 'user4',
-    username: 'dev_showcase',
-    display_name: 'Dev Showcase',
-    last_message: 'Check out my new portfolio!',
-    last_message_time: '3 hours ago',
-    unread_count: 0,
-    avatar_color: 'from-orange-500 to-red-500',
-  },
-]
-
-export default function MessagesPage() {
+function MessagesContent() {
   const [user, setUser] = useState<any>(null)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
@@ -611,5 +572,17 @@ export default function MessagesPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function MessagesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+      </div>
+    }>
+      <MessagesContent />
+    </Suspense>
   )
 }
