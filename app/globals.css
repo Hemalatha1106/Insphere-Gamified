@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer base {
+  :root {
+    /* Dark gaming aesthetic */
+    --background: 240 15% 4%;
+    --foreground: 240 5% 95%;
+    --card: 240 10% 8%;
+    --card-foreground: 240 5% 95%;
+    --popover: 240 10% 8%;
+    --popover-foreground: 240 5% 95%;
+    --primary: 260 100% 65%;
+    --primary-foreground: 240 15% 4%;
+    --secondary: 200 100% 60%;
+    --secondary-foreground: 240 15% 4%;
+    --muted: 240 10% 25%;
+    --muted-foreground: 240 5% 60%;
+    --accent: 300 100% 65%;
+    --accent-foreground: 240 15% 4%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 10% 20%;
+    --input: 240 10% 15%;
+    --ring: 260 100% 65%;
+    --chart-1: 260 100% 65%;
+    --chart-2: 200 100% 60%;
+    --chart-3: 300 100% 65%;
+    --chart-4: 180 100% 55%;
+    --chart-5: 270 100% 70%;
+    --radius: 0.5rem;
+  }
+} /* This closing brace was missing for the first @layer base block */
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
