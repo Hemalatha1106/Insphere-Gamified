@@ -1,0 +1,12 @@
+[
+  {
+    "id": "332a9038-c8f7-4720-9337-f42f28d8a6c9",
+    "user_id": "2d2fcf5d-91a7-4d90-9066-0377db3ad841",
+    "platform": "geeksforgeeks",
+    "total_problems": 0,
+    "problems_solved": 59,
+    "contest_rating": 118,
+    "level": "Score: 118",
+    "updated_at": "2026-02-10T06:06:50.131221"
+  }
+]

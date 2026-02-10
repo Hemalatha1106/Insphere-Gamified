@@ -118,6 +118,26 @@ export function EditProfileForm({ onSuccess, onCancel }: EditProfileFormProps) {
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) throw new Error('Not authenticated')
 
+            // Check if username is taken (if changed)
+            if (formData.username) {
+                const { data: existingUser, error: checkError } = await supabase
+                    .from('profiles')
+                    .select('id')
+                    .eq('username', formData.username)
+                    .neq('id', user.id) // Exclude current user
+                    .single()
+
+                if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found", which is good
+                    throw checkError
+                }
+
+                if (existingUser) {
+                    toast.error('Username is already taken. Please choose another one.')
+                    setSaving(false)
+                    return
+                }
+            }
+
             const { error: profileError } = await supabase
                 .from('profiles')
                 .update({
@@ -135,7 +155,13 @@ export function EditProfileForm({ onSuccess, onCancel }: EditProfileFormProps) {
                 })
                 .eq('id', user.id)
 
-            if (profileError) throw profileError
+            if (profileError) {
+                if (profileError.code === '23505') { // Postgres unique violation code
+                    toast.error('Username is already taken. Please choose another one.')
+                    return
+                }
+                throw profileError
+            }
 
             // Trigger server-side stats update
             const response = await fetch('/api/profile/update', {

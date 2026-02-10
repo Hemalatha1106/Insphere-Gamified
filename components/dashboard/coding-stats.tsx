@@ -33,7 +33,18 @@ export function CodingStatsCard({ platform, stats }: CodingStatsCardProps) {
               <span className="text-sm text-slate-300">Problems Solved</span>
               <span className="text-xl font-bold text-white">{stats.problems_solved}</span>
             </div>
-            <div className="space-y-1">
+
+            {stats.contest_rating > 0 && (
+              <div className="flex justify-between items-center py-1">
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-4 h-4 text-yellow-500" />
+                  <span className="text-xs text-slate-400">Rating</span>
+                </div>
+                <span className="font-medium text-yellow-400">{stats.contest_rating}</span>
+              </div>
+            )}
+
+            <div className="space-y-1 mt-1">
               <div className="flex justify-between text-xs">
                 <span className="text-slate-400">Progress</span>
                 <span className="text-slate-400">{Math.round(solvingPercentage)}%</span>

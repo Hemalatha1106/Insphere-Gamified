@@ -23,6 +23,10 @@ interface Profile {
   level_progress: number
   followers_count: number
   following_count: number
+  leetcode_username?: string
+  github_username?: string
+  codeforces_username?: string
+  geeksforgeeks_username?: string
 }
 
 interface CodingStats {
@@ -38,12 +42,51 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [codingStats, setCodingStats] = useState<CodingStats[]>([])
   const [badges, setBadges] = useState<any[]>([])
+  const [earnedBadgeIds, setEarnedBadgeIds] = useState<string[]>([])
+  const [leaderboard, setLeaderboard] = useState<any[]>([])
   const [unreadMessageCount, setUnreadMessageCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
   const { toast } = useToast()
+
+  // Auto-refresh stats on load if profiles are connected
+  useEffect(() => {
+    if (profile) {
+      const refreshStats = async () => {
+        // Only refresh if we have at least one connected account
+        if (profile.leetcode_username || profile.github_username || profile.codeforces_username || profile.geeksforgeeks_username) {
+          console.log('Auto-refreshing stats...')
+          try {
+            const res = await fetch('/api/profile/update', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                leetcode: profile.leetcode_username,
+                github: profile.github_username,
+                codeforces: profile.codeforces_username,
+                geeksforgeeks: profile.geeksforgeeks_username
+              })
+            })
+
+            if (res.ok) {
+              const data = await res.json()
+              if (data.stats) {
+                setCodingStats(data.stats)
+                // Also update profile/badges if points changed
+                const { data: newProfile } = await supabase.from('profiles').select('*').eq('id', profile.id).single()
+                if (newProfile) setProfile(newProfile)
+              }
+            }
+          } catch (e) {
+            console.error('Auto-refresh failed', e)
+          }
+        }
+      }
+      refreshStats()
+    }
+  }, [profile?.id]) // Run when profile ID is loaded (using profile object might cause loop if we update it)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -178,11 +221,33 @@ export default function DashboardPage() {
         if (statsError) throw statsError
         setCodingStats(statsData || [])
 
-        // Fetch badges
-        const { data: badgesData, error: badgesError } = await supabase.from('badges').select('*')
+        // Fetch all badges
+        const { data: badgesData, error: badgesError } = await supabase.from('badges').select('*').order('points_value', { ascending: true })
 
         if (badgesError) throw badgesError
         setBadges(badgesData || [])
+
+        // Fetch user earned badges
+        const { data: userBadgesData, error: userBadgesError } = await supabase
+          .from('user_badges')
+          .select('badge_id')
+          .eq('user_id', authUser.id)
+
+        if (!userBadgesError && userBadgesData) {
+          const earnedIds = userBadgesData.map((ub: any) => ub.badge_id)
+          setEarnedBadgeIds(earnedIds)
+        }
+
+        // Fetch Leaderboard
+        const { data: leaderboardData, error: leaderboardError } = await supabase
+          .from('profiles')
+          .select('id, username, display_name, total_points, avatar_url')
+          .order('total_points', { ascending: false })
+          .limit(5)
+
+        if (!leaderboardError) {
+          setLeaderboard(leaderboardData || [])
+        }
 
         return () => {
           supabase.removeChannel(channel)
@@ -275,7 +340,14 @@ export default function DashboardPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Profile Section */}
         <section className="mb-8">
-          {profile && <ProfileCard user={user} profile={profile} />}
+          {profile && (
+            <ProfileCard
+              user={user}
+              profile={profile}
+              badges={badges}
+              earnedBadgeIds={earnedBadgeIds}
+            />
+          )}
         </section>
 
         {/* Stats Grid */}
@@ -293,7 +365,7 @@ export default function DashboardPage() {
 
         {/* Badges Section */}
         <section className="mb-8">
-          <BadgesShowcase badges={badges} earnedBadgeIds={[badges[0]?.id, badges[2]?.id].filter(Boolean)} />
+          <BadgesShowcase badges={badges} earnedBadgeIds={earnedBadgeIds} />
         </section>
 
         {/* Leaderboard Preview */}
@@ -303,24 +375,34 @@ export default function DashboardPage() {
             Global Leaderboard
           </h2>
           <div className="space-y-2">
-            {[
-              { rank: 1, name: 'AlgoKing', points: 15230 },
-              { rank: 2, name: 'CodeNinja', points: 14980 },
-              { rank: 3, name: 'StackMaster', points: 14750 },
-              { rank: 4, name: 'BinaryBoss', points: 14320 },
-            ].map((entry) => (
-              <div key={entry.rank} className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition">
+            {leaderboard.map((entry, index) => (
+              <div key={entry.id} className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition">
                 <div className="flex items-center gap-3">
-                  <span className="text-lg font-bold text-yellow-400">#{entry.rank}</span>
-                  <span className="text-white">{entry.name}</span>
+                  <span className={`text-lg font-bold ${index === 0 ? 'text-yellow-400' : index === 1 ? 'text-slate-400' : index === 2 ? 'text-orange-400' : 'text-slate-500'}`}>
+                    #{index + 1}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-slate-800 overflow-hidden">
+                      {entry.avatar_url ? (
+                        <img src={entry.avatar_url} alt={entry.display_name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-purple-900 text-purple-200 text-xs font-bold">
+                          {entry.display_name?.charAt(0) || '?'}
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-white font-medium">{entry.display_name}</span>
+                  </div>
                 </div>
-                <span className="text-purple-400 font-bold">{entry.points} pts</span>
+                <span className="text-purple-400 font-bold">{entry.total_points} pts</span>
               </div>
             ))}
           </div>
-          <Button className="w-full mt-4 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700">
-            View Full Leaderboard
-          </Button>
+          <Link href="/leaderboard">
+            <Button className="w-full mt-4 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700">
+              View Full Leaderboard
+            </Button>
+          </Link>
         </section>
       </div>
     </div>

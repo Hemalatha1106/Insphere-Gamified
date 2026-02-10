@@ -1,225 +1,81 @@
-# Insphere - Competitive Programming Platform
+# Insphere - Gamified Competitive Programming Platform
 
-A gamified social platform for tracking competitive programming progress across LeetCode, GeeksforGeeks, Codeforces, and GitHub. Built with Next.js 16, Supabase, and featuring a dark modern gaming aesthetic.
+A gamified social platform for tracking competitive programming progress across LeetCode, GeeksforGeeks, Codeforces, and GitHub. Built with Next.js 16, Supabase, and featuring a stark, modern dark-mode aesthetic.
 
-## Features
+## 🚀 Key Features
 
-### Profile Tracking Dashboard
-- **Multi-Platform Support**: Track stats from LeetCode, GeeksforGeeks, Codeforces, and GitHub in one place
-- **Profile Analytics**: View your coding statistics, progress, and achievements
-- **Real-time Syncing**: Connect your usernames to pull live data from platforms
+### 👤 Public Profiles & Portfolio
+- **Unified Stats**: Aggregate your coding stats from LeetCode, GitHub, Codeforces, and GeeksforGeeks.
+- **Shareable Card**: A dedicated public profile page (`/u/[username]`) to showcase your achievements.
+- **PDF Export**: Generate a professional, print-ready resume/CV from your profile with one click.
+- **Dynamic Avatar**: Upload custom avatars and banner images.
 
-### Gamification System
-- **Points & Levels**: Earn points by solving problems and reaching milestones
-- **Badges & Achievements**: Unlock special badges for achievements like "Century Club", "Problem Slayer", and "Streak Master"
-- **Leaderboards**: Compete globally and see where you rank among other competitive programmers
+### 🏆 Gamification
+- **Leaderboards**: Compete globally across all platforms.
+- **Badges**: Earn unique badges for milestones (e.g., "Century Club", "Streak Master").
+- **Levels & XP**: Gain XP for every problem solved and level up your profile.
 
-### Community & Social
-- **Friend System**: Send and accept friend requests to build your network
-- **Direct Messaging**: Real-time chat with friends with unread indicators and toast notifications
-- **Private Communities**: Create invite-only groups with access codes
-- **Discover Users**: Find and follow other competitive programmers
-- **Community Posts**: Share tips, achievements, and discuss strategies
+### 💬 Social & Community
+- **Direct Messaging**: Real-time chat with friends, complete with unread indicators and toast notifications.
+- **Community Channels**: dedicated spaces for discussion and doubts.
+- **Friend System**: Follow/Unfollow and friend request system to build your network.
 
-### Direct Messaging
-- **Real-time Chat**: Instant message delivery with Supabase Realtime
-- **Friend-only Access**: Secure messaging only between connected friends
-- **Rich Notifications**: Toast popups for new messages and dashboard badges
-- **Unread Indicators**: Visual glowing dot indicators for unread conversations
+## 🛠️ Tech Stack
 
-### Progress Analytics
-- **Monthly Charts**: Visualize your problem-solving progress over time
-- **Platform Statistics**: Detailed stats for each coding platform
-- **Streak Tracking**: Maintain and track daily coding streaks
-- **Insights**: Get personalized recommendations based on your performance
+- **Frontend**: Next.js 16 (App Router), React, TypeScript, Tailwind CSS
+- **Backend**: Supabase (PostgreSQL, Auth, Storage, Realtime)
+- **UI Components**: Shadcn/UI, Lucide Icons, Sonner (Toasts)
+- **Utilities**: `react-to-print` (handling PDF generation via native print), `recharts` (analytics)
 
-## Tech Stack
+## 📦 Deployment
 
-- **Frontend**: Next.js 16, React, TypeScript
-- **Styling**: Tailwind CSS, Shadcn/UI components
-- **Backend**: Supabase (PostgreSQL + Auth)
-- **Authentication**: Supabase Auth with email/password
-- **Icons**: Lucide React
-- **Fonts**: Inter (body), JetBrains Mono (code)
+We have a dedicated guide for deploying this project to Vercel.
 
-## Getting Started
+👉 **[Read the Deployment Guide (DEPLOY.md)](./DEPLOY.md)**
 
-### Prerequisites
-- Node.js 18+
-- Supabase project (free tier available)
+## 🏁 Getting Started Locally
 
-### Installation
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/insphere-gamified.git
+   cd insphere-gamified
+   ```
 
-1. **Clone and setup**
+2. **Install dependencies**
    ```bash
    npm install
    ```
 
-2. **Configure environment variables**
-   Add these to your `.env.local`:
-   ```
+3. **Set up Environment Variables**
+   Create a `.env.local` file in the root directory:
+   ```env
    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
    SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+   NEXT_PUBLIC_APP_URL=http://localhost:3000
    ```
 
-3. **Run migrations** (if needed)
-   Execute the SQL scripts in `/scripts` folder against your Supabase database:
-   - `001_initial_schema.sql` - Core tables (profiles, coding_stats, badges)
-   - `002_rls_policies.sql` - Row Level Security policies
-   - `003_seed_badges.sql` - Initial badge data
-   - `012_follow_system.sql` - Follow/Unfollow logic
-   - `013_fix_community_policies.sql` - Admin rights fixes
-   - `014_friend_system.sql` - Friend requests table and policies
-   - `015_fix_friend_references.sql` - FK fixes for friends
-   - `016_reset_unread_messages.sql` - Unread message state reset
-
-4. **Start development server**
+4. **Run the development server**
    ```bash
    npm run dev
    ```
 
-5. **Open browser**
-   Navigate to `http://localhost:3000`
+5. **Open your browser**
+   Navigate to [http://localhost:3000](http://localhost:3000).
 
-## Project Structure
+## 🗄️ Database Schema
 
-```
-app/
-├── page.tsx                 # Landing page
-├── dashboard/              # Main dashboard
-├── community/              # Community posts & discussions
-├── messages/               # Direct messaging
-├── leaderboard/            # Global leaderboard
-├── badges/                 # Badge showcase
-├── analytics/              # Progress visualization
-├── profile/                # Profile settings
-├── users/                  # User discovery
-└── auth/                   # Authentication pages
-    ├── login/
-    ├── sign-up/
-    └── error/
+The project uses Supabase (PostgreSQL). Key tables include:
+- `profiles`: User data and stats.
+- `coding_stats`: Platform-specific metrics.
+- `messages`: Direct messages between users.
+- `notifications`: Centralized command center (WIP).
+- `badges` & `user_badges`: Gamification system.
 
-components/
-├── dashboard/              # Dashboard-specific components
-│   ├── profile-card.tsx
-│   ├── coding-stats.tsx
-│   └── badges-showcase.tsx
+## 🤝 Contributing
 
-lib/
-├── supabase/               # Supabase client setup
-│   ├── client.ts
-│   ├── server.ts
-│   └── proxy.ts
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-scripts/
-├── 001_tables.sql         # Table creation
-├── 002_rls_policies.sql   # Security policies
-└── 003_seed_badges.sql    # Initial data
-```
+## 📄 License
 
-## Key Pages
-
-### Authentication
-- `/auth/login` - Sign in to existing account
-- `/auth/sign-up` - Create new account
-- `/auth/sign-up-success` - Confirmation page
-
-### User Facing
-- `/dashboard` - Main dashboard with profile and stats
-- `/community` - Browse and post in community
-- `/messages` - Direct messaging with users
-- `/leaderboard` - Global rankings
-- `/badges` - Achievement showcase
-- `/analytics` - Progress charts and insights
-- `/profile` - Edit profile and connect platforms
-- `/users` - Discover and follow users
-
-## Database Schema
-
-### Core Tables
-- **profiles** - User profile information and stats
-- **coding_stats** - Per-platform problem solving stats
-- **badges** - Available badges definition
-- **user_badges** - Badge ownership (earned badges)
-- **leaderboard** - Rankings and scores
-
-### Social Features
-- **follows** - User follow relationships
-- **messages** - Direct messages between users
-- **community_posts** - Community discussion posts
-- **post_comments** - Comments on posts
-- **post_likes** - Post engagement tracking
-
-## Authentication Flow
-
-1. Users sign up with email/password
-2. Supabase creates auth user and triggers profile creation via trigger
-3. User confirms email
-4. Profile auto-created with user metadata
-5. User logs in and accesses protected routes
-6. Middleware validates session
-
-## Row Level Security (RLS)
-
-All tables have RLS enabled with policies allowing:
-- Users to read public data
-- Users to modify only their own data
-- Proper isolation between user data
-
-## Design System
-
-### Colors
-- **Primary**: Purple (#a855f7) / Pink (#ec4899)
-- **Secondary**: Blue (#0ea5e9)
-- **Accent**: Yellow (#facc15) / Orange (#f97316)
-- **Background**: Slate-950 (#030712)
-- **Surface**: Slate-800 (#1e293b)
-
-### Typography
-- **Headings**: Inter Bold
-- **Body**: Inter Regular
-- **Mono**: JetBrains Mono
-
-## Future Enhancements
-
-- Real API integrations for live platform stats
-- Discord bot for notifications
-- Mobile app (React Native)
-- Advanced analytics with ML insights
-- Scheduled contests within platform
-- Problem recommendation engine
-- Study groups and team features
-
-## Deployment
-
-### Vercel (Recommended)
-1. Push code to GitHub
-2. Connect repo to Vercel
-3. Add environment variables
-4. Deploy
-
-### Self-hosted
-- Use Node.js adapter
-- Ensure Supabase connectivity
-- Set environment variables
-
-## Contributing
-
-This is a starter template. Feel free to extend with:
-- Real platform API integrations
-- Additional features
-- UI improvements
-- Performance optimizations
-
-## License
-
-MIT License - Built for the competitive programming community
-
-## Support
-
-For issues or questions, check the Supabase documentation and Next.js docs for integration help.
-
----
-
-**Built with love for competitive programmers** 🎮
+This project is open source and available under the [MIT License](LICENSE).

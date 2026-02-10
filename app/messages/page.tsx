@@ -1,14 +1,13 @@
 'use client'
 
-import React from "react"
-
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Send, Search, Plus, ArrowLeft, MessageCircle, Loader2 } from 'lucide-react'
+import { Send, Search, Plus, ArrowLeft, MessageCircle, Loader2, Image as ImageIcon, X } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface Conversation {
   id: string
@@ -26,6 +25,7 @@ interface Message {
   sender_id: string
   recipient_id: string
   content: string
+  image_url?: string
   created_at: string
   is_read: boolean
 }
@@ -77,6 +77,13 @@ export default function MessagesPage() {
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [sending, setSending] = useState(false)
+
+  // Image Upload State
+  const [selectedImage, setSelectedImage] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const router = useRouter()
   const searchParams = useSearchParams()
   const targetUserId = searchParams.get('userId')
@@ -89,7 +96,7 @@ export default function MessagesPage() {
 
   useEffect(() => {
     scrollToBottom()
-  }, [messages])
+  }, [messages, imagePreview])
 
   // 1. Auth & Initial Load
   useEffect(() => {
@@ -211,11 +218,19 @@ export default function MessagesPage() {
         (payload) => {
           const newMsg = payload.new as Message
           // If message is from current conversation, append it
+          // Use ref to check current selected, or rely on closure (selectedConversation is in dep array)
           if (selectedConversation && newMsg.sender_id === selectedConversation.id) {
             setMessages(prev => [...prev, newMsg])
-            // Mark as read immediately? Or let the effect handle it?
-            // Effect will handle if we trigger it, but for now we rely on user action or selecting.
-            // Actually, we should probably mark it read if we are viewing it.
+
+            // Mark as read immediately since we are looking at it
+            supabase
+              .from('messages')
+              .update({ is_read: true })
+              .eq('id', newMsg.id)
+              .then(({ error }) => {
+                if (error) console.error("Failed to mark RT message read", error)
+              })
+
           } else {
             // Increment unread count for that conversation
             setConversations(prev => prev.map(c => {
@@ -226,6 +241,7 @@ export default function MessagesPage() {
             }))
           }
         }
+
       )
       .on(
         'postgres_changes',
@@ -255,44 +271,117 @@ export default function MessagesPage() {
     }
   }, [selectedConversation, user, supabase])
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size must be less than 5MB")
+      return
+    }
+
+    setSelectedImage(file)
+    const previewUrl = URL.createObjectURL(file)
+    setImagePreview(previewUrl)
+
+    // Reset input value
+    e.target.value = ''
+  }
+
+  const removeSelectedImage = () => {
+    setSelectedImage(null)
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview)
+      setImagePreview(null)
+    }
+  }
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newMessage.trim() || !selectedConversation || !user) return
+    if ((!newMessage.trim() && !selectedImage) || !selectedConversation || !user || sending) return
 
+    setSending(true)
     const content = newMessage.trim()
-    setNewMessage('') // Clear input immediately
+    let imageUrl = null
+
+    // Create optimistic message
+    const tempId = Math.random().toString()
+    const optimisticImage = imagePreview // Use preview for immediate display
 
     // Optimistic Update
     const optimisticMessage: Message = {
-      id: Math.random().toString(), // Temp ID
+      id: tempId,
       sender_id: user.id,
       recipient_id: selectedConversation.id,
-      content: content,
+      content: content || (optimisticImage ? 'Shared an image' : ''),
+      image_url: optimisticImage || undefined,
       created_at: new Date().toISOString(),
       is_read: false,
     }
     setMessages(prev => [...prev, optimisticMessage])
+    setNewMessage('')
 
-    // Send to DB
-    const { data, error } = await supabase
-      .from('messages')
-      .insert([{
-        sender_id: user.id,
-        recipient_id: selectedConversation.id,
-        content: content
-      }])
-      .select()
-      .single()
+    // We defer clearing image selection until success/fail or maybe just clear it now?
+    // Let's hold onto it until upload done to be safe, but UI wise we should clear preview or show loading.
+    // For now, let's clear inputs to mimic instant feel.
+    setShowImagePreviewInChatInput(false)
 
-    if (error) {
+    try {
+      // 1. Upload Image
+      if (selectedImage) {
+        const fileExt = selectedImage.name.split('.').pop()
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+        const filePath = `${user.id}/${fileName}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('message-images')
+          .upload(filePath, selectedImage)
+
+        if (uploadError) throw uploadError
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('message-images')
+          .getPublicUrl(filePath)
+
+        imageUrl = publicUrl
+      }
+
+      // 2. Insert Message
+      const { data, error } = await supabase
+        .from('messages')
+        .insert([{
+          sender_id: user.id,
+          recipient_id: selectedConversation.id,
+          content: content,
+          image_url: imageUrl
+        }])
+        .select()
+        .single()
+
+      if (error) throw error
+
+      if (data) {
+        // Replace temp ID with real one
+        setMessages(prev => prev.map(m => m.id === tempId ? data : m))
+      }
+
+      removeSelectedImage()
+    } catch (error) {
       console.error('Error sending message:', error)
-      // Rollback optimistic update implementation omitted for brevity, but recommended
-    } else if (data) {
-      // Replace temp ID with real one? 
-      // Actual subscription might handle it, or we just update state
-      setMessages(prev => prev.map(m => m.id === optimisticMessage.id ? data : m))
+      toast.error('Failed to send message')
+      // Rollback
+      setMessages(prev => prev.filter(m => m.id !== tempId))
+      setShowImagePreviewInChatInput(true) // Restore
+    } finally {
+      setSending(false)
     }
   }
+
+  // Wrapper to toggle preview visibility in input relative to upload state
+  const [showImagePreviewInChatInput, setShowImagePreviewInChatInput] = useState(true)
+  useEffect(() => {
+    if (selectedImage) setShowImagePreviewInChatInput(true)
+  }, [selectedImage])
 
   const filteredConversations = conversations.filter((conv) =>
     conv.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -432,12 +521,22 @@ export default function MessagesPage() {
                       className={`flex ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
-                        className={`max-w-[80%] md:max-w-md px-4 py-2 rounded-2xl ${msg.sender_id === user?.id
+                        className={`max-w-[80%] md:max-w-md px-4 py-2 rounded-2xl space-y-2 ${msg.sender_id === user?.id
                           ? 'bg-purple-600 text-white rounded-br-none'
                           : 'bg-slate-800 text-slate-200 rounded-bl-none'
                           }`}
                       >
-                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                        {msg.image_url && (
+                          <div className="rounded-lg overflow-hidden my-1 max-w-full bg-black/20">
+                            <img
+                              src={msg.image_url}
+                              alt="Shared content"
+                              className="max-w-full h-auto object-cover max-h-64 rounded-lg cursor-pointer hover:opacity-95 transition-opacity"
+                              onClick={() => window.open(msg.image_url, '_blank')}
+                            />
+                          </div>
+                        )}
+                        {msg.content && <p className="text-sm whitespace-pre-wrap">{msg.content}</p>}
                         <p className={`text-[10px] mt-1 text-right ${msg.sender_id === user?.id ? 'text-purple-200' : 'text-slate-500'}`}>
                           {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </p>
@@ -450,16 +549,52 @@ export default function MessagesPage() {
 
               {/* Input */}
               <div className="p-4 border-t border-slate-800 bg-slate-900/80">
-                <form onSubmit={handleSendMessage} className="flex gap-2">
+                {showImagePreviewInChatInput && imagePreview && (
+                  <div className="mb-3 relative inline-block">
+                    <div className="relative rounded-lg overflow-hidden border border-slate-700 w-24 h-24 group">
+                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-white hover:text-red-400 h-8 w-8 rounded-full bg-black/50 hover:bg-black/70"
+                          onClick={removeSelectedImage}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <form onSubmit={handleSendMessage} className="flex gap-2 items-end">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="text-slate-400 hover:text-white shrink-0"
+                    onClick={() => fileInputRef.current?.click()}
+                    title="Upload Image"
+                  >
+                    <ImageIcon className="w-5 h-5" />
+                  </Button>
                   <Input
                     type="text"
                     placeholder="Type a message..."
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    className="bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus-visible:ring-purple-500"
+                    className="bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus-visible:ring-purple-500 min-h-[40px]"
+                    disabled={sending}
                   />
-                  <Button type="submit" className="bg-purple-600 hover:bg-purple-700 shadow-lg shadow-purple-500/20 px-4" disabled={!newMessage.trim()}>
-                    <Send className="w-4 h-4" />
+                  <Button type="submit" className="bg-purple-600 hover:bg-purple-700 shadow-lg shadow-purple-500/20 px-4 shrink-0" disabled={sending || (!newMessage.trim() && !selectedImage)}>
+                    {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   </Button>
                 </form>
               </div>

@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+// --- Helpers ---
+
 // Helper to extract username from input which might be a URL
 const extractUsername = (input: string, platform: string): string => {
     if (!input) return ''
@@ -41,6 +43,36 @@ const extractUsername = (input: string, platform: string): string => {
     return input.replace(/\/$/, '')
 }
 
+// Logic based on user's provided reliable scraper
+const extractObject = (unescapedData: string, key: string): any => {
+    const searchPattern = `"${key}":`
+    const startIdx = unescapedData.indexOf(searchPattern)
+    if (startIdx === -1) return null
+
+    let openBraceIdx = unescapedData.indexOf('{', startIdx)
+    if (openBraceIdx === -1) return null
+
+    let braceCount = 0
+    let endIdx = -1
+
+    for (let i = openBraceIdx; i < unescapedData.length; i++) {
+        if (unescapedData[i] === '{') braceCount++
+        else if (unescapedData[i] === '}') braceCount--
+
+        if (braceCount === 0) {
+            endIdx = i + 1
+            break
+        }
+    }
+
+    if (endIdx === -1) return null
+    try {
+        return JSON.parse(unescapedData.substring(openBraceIdx, endIdx))
+    } catch (e) {
+        return null
+    }
+}
+
 export async function POST(request: Request) {
     try {
         const supabase = await createClient()
@@ -61,28 +93,110 @@ export async function POST(request: Request) {
         codeforces = extractUsername(codeforces, 'codeforces')
         geeksforgeeks = extractUsername(geeksforgeeks, 'geeksforgeeks')
 
-        console.log('API Request - Extracted usernames:', { leetcode, github, codeforces, geeksforgeeks })
-
         // 1. Fetch Stats from external APIs
         const stats: any[] = []
 
         // --- LeetCode ---
+        // --- LeetCode ---
         if (leetcode) {
             try {
-                const lcRes = await fetch(`https://leetcode-stats-api.herokuapp.com/${leetcode}`)
-                if (lcRes.ok) {
-                    const lcData = await lcRes.json()
-                    if (lcData.status === 'success') {
-                        stats.push({
-                            user_id: userId,
-                            platform: 'leetcode',
-                            total_problems: lcData.totalQuestions || 0,
-                            problems_solved: lcData.totalSolved || 0,
-                            contest_rating: 0,
-                            level: lcData.ranking ? `Rank ${lcData.ranking}` : 'Active'
-                        })
+                let totalSolved = 0
+                let totalQuestions = 0
+                let ranking = 'Active'
+                let contestRating = 0
+
+                // Strategy: Try robust APIs in order
+                // Mirroring successful approach from community scripts
+
+                const fetchLeetCodeStats = async () => {
+                    // Try Alfa API first (seems more reliable recently)
+                    try {
+                        const [solvedRes, profileRes, contestRes] = await Promise.all([
+                            fetch(`https://alfa-leetcode-api.onrender.com/${leetcode}/solved`),
+                            fetch(`https://alfa-leetcode-api.onrender.com/${leetcode}`),
+                            fetch(`https://alfa-leetcode-api.onrender.com/${leetcode}/contest`)
+                        ])
+
+                        if (solvedRes.ok) {
+                            const solvedData = await solvedRes.json()
+                            if (solvedData.solvedProblem) {
+                                totalSolved = solvedData.solvedProblem
+                            }
+                        }
+
+                        if (profileRes.ok) {
+                            const profileData = await profileRes.json()
+                            if (profileData.ranking) {
+                                ranking = `Rank ${profileData.ranking}`
+                            }
+                        }
+
+                        if (contestRes.ok) {
+                            const contestData = await contestRes.json()
+                            if (contestData.contestRating) {
+                                contestRating = Math.round(contestData.contestRating)
+                            }
+                        }
+
+                        // If we got valid data, return true
+                        if (totalSolved > 0) return true
+                    } catch (e) {
+                        console.warn('Alfa API failed, trying fallback...', e)
                     }
+
+                    // Fallback 1: FaisalShohag API
+                    try {
+                        const res = await fetch(`https://leetcode-api-faisalshohag.vercel.app/${leetcode}`)
+                        if (res.ok) {
+                            const data = await res.json()
+                            if (data.totalSolved) {
+                                totalSolved = data.totalSolved
+                                totalQuestions = data.totalQuestions || 0
+                                ranking = data.ranking ? `Rank ${data.ranking}` : 'Active'
+                                // rating is not directly available usually, or might be inside? 
+                                // Inspecting JSON: "reputation": 0, ... no contest rating easily found in simple output? 
+                                // Actually debug output showed: "ranking": 164222, "contributionPoint": ..., "reputation": 0
+                                // It seems this API might not return contest rating directly in the root or same format.
+                                // Let's check keys from debug: ... "totalSolved", "easySolved", ... 
+                                // If contest rating is missing, we leave it as 0 or try to fetch it separately if possible?
+                                // For now, let's accept solved count is better than 0.
+                                return true
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('FaisalShohag API failed', e)
+                    }
+
+                    // Fallback 2: Heroku API
+                    try {
+                        const lcRes = await fetch(`https://leetcode-stats-api.herokuapp.com/${leetcode}`)
+                        if (lcRes.ok) {
+                            const lcData = await lcRes.json()
+                            if (lcData.status === 'success') {
+                                totalQuestions = lcData.totalQuestions || 0
+                                totalSolved = lcData.totalSolved || 0
+                                ranking = lcData.ranking ? `Rank ${lcData.ranking}` : 'Active'
+                                return true
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Heroku API failed', e)
+                    }
+
+                    return false
                 }
+
+                await fetchLeetCodeStats()
+
+                stats.push({
+                    user_id: userId,
+                    platform: 'leetcode',
+                    total_problems: totalQuestions, // Alfa doesn't always give total *available*, but that's fine, we focus on solved
+                    problems_solved: totalSolved,
+                    contest_rating: contestRating,
+                    level: ranking
+                })
+
             } catch (e) {
                 console.error('LeetCode fetch error:', e)
             }
@@ -193,19 +307,87 @@ export async function POST(request: Request) {
             }
         }
 
-        console.log('Stats collected:', stats)
-
         // --- GeeksforGeeks ---
         if (geeksforgeeks) {
-            stats.push({
-                user_id: userId,
-                platform: 'geeksforgeeks',
-                total_problems: 0,
-                problems_solved: 0,
-                contest_rating: 0,
-                level: 'Connected'
-            })
+            try {
+                // Fetch the main profile page which contains the data in Next.js hydration scripts
+                const targetUrl = `https://www.geeksforgeeks.org/user/${geeksforgeeks}/`
+
+                const gfgRes = await fetch(targetUrl, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                    }
+                })
+
+                if (gfgRes.ok) {
+                    const html = await gfgRes.text()
+
+                    // Use the reliable parsing logic
+                    const pushChunks = html.match(/self\.__next_f\.push\(\[1,"(.*?)"\]\)/g) || []
+
+                    let unescapedData = pushChunks
+                        .map(chunk => {
+                            const contentMatch = chunk.match(/push\(\[1,"(.*)"\]\)/)
+                            return contentMatch ? contentMatch[1]
+                                .replace(/\\"/g, '"')
+                                .replace(/\\\\/g, '\\')
+                                .replace(/\\u003c/g, '<')
+                                .replace(/\\u003e/g, '>') : ""
+                        })
+                        .join('')
+
+                    const userData = extractObject(unescapedData, "userData")
+
+                    const gfgStats = userData?.data || {}
+                    let problemsSolved = gfgStats.total_problems_solved || 0
+                    let codingScore = gfgStats.score || 0
+
+                    // Fallback
+                    if (!problemsSolved || !codingScore) {
+                        const scoreMatch = unescapedData.match(/"score"\s*:\s*(\d+)/)
+                        const solvedMatch = unescapedData.match(/"total_problems_solved"\s*:\s*(\d+)/)
+
+                        if (scoreMatch) codingScore = parseInt(scoreMatch[1], 10)
+                        if (solvedMatch) problemsSolved = parseInt(solvedMatch[1], 10)
+                    }
+
+                    let level = 'Connected'
+                    if (codingScore > 0) {
+                        level = `Score: ${codingScore}`
+                    }
+
+                    stats.push({
+                        user_id: userId,
+                        platform: 'geeksforgeeks',
+                        total_problems: 0,
+                        problems_solved: problemsSolved,
+                        contest_rating: codingScore,
+                        level: level
+                    })
+                } else {
+                    stats.push({
+                        user_id: userId,
+                        platform: 'geeksforgeeks',
+                        total_problems: 0,
+                        problems_solved: 0,
+                        contest_rating: 0,
+                        level: 'Connection Failed'
+                    })
+                }
+            } catch (e: any) {
+                console.error('GeeksforGeeks fetch error:', e)
+                stats.push({
+                    user_id: userId,
+                    platform: 'geeksforgeeks',
+                    total_problems: 0,
+                    problems_solved: 0,
+                    contest_rating: 0,
+                    level: 'Error'
+                })
+            }
         }
+
+        console.log('Stats collected:', stats)
 
         // 2. Update Database
         if (stats.length > 0) {
@@ -243,9 +425,22 @@ export async function POST(request: Request) {
 
         if (allStats) {
             allStats.forEach((s: any) => {
-                if (s.platform === 'leetcode') totalPoints += (s.problems_solved * 10)
-                if (s.platform === 'github') totalPoints += (s.problems_solved * 5) // weighted contributions less than full problems
-                if (s.platform === 'codeforces') totalPoints += (s.problems_solved * 15) + (s.contest_rating > 0 ? s.contest_rating : 0)
+                if (s.platform === 'leetcode') {
+                    // 10 pts per problem + (Rating / 10)
+                    totalPoints += (s.problems_solved * 10) + Math.floor((s.contest_rating || 0) / 10)
+                }
+                if (s.platform === 'github') {
+                    // 10 pts per Repo + 1 pt per Contribution (solved = contributions, total = repos in our schema)
+                    totalPoints += (s.total_problems * 10) + (s.problems_solved * 1)
+                }
+                if (s.platform === 'codeforces') {
+                    // 20 pts per problem + (Rating / 5)
+                    totalPoints += (s.problems_solved * 20) + Math.floor((s.contest_rating || 0) / 5)
+                }
+                if (s.platform === 'geeksforgeeks') {
+                    // 5 pts per problem + (Score / 5) -> contest_rating holds Score for GFG
+                    totalPoints += (s.problems_solved * 5) + Math.floor((s.contest_rating || 0) / 5)
+                }
             })
         }
 

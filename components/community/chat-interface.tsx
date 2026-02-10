@@ -4,11 +4,13 @@ import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Send, User } from 'lucide-react'
+import { Send, User, Image as ImageIcon, X, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface Message {
     id: string
     content: string
+    image_url?: string
     created_at: string
     user_id: string
     community_id: string // Added for client-side filtering
@@ -19,8 +21,6 @@ interface Message {
     }
 }
 
-// ... (Client Code)
-
 interface ChatInterfaceProps {
     communityId: string
     currentUserId: string
@@ -30,7 +30,12 @@ export function ChatInterface({ communityId, currentUserId }: ChatInterfaceProps
     const [messages, setMessages] = useState<Message[]>([])
     const [newMessage, setNewMessage] = useState('')
     const [sending, setSending] = useState(false)
+    const [selectedImage, setSelectedImage] = useState<File | null>(null)
+    const [imagePreview, setImagePreview] = useState<string | null>(null)
+    const [uploading, setUploading] = useState(false)
+
     const messagesEndRef = useRef<HTMLDivElement>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
     const supabase = createClient()
 
     const scrollToBottom = () => {
@@ -39,7 +44,7 @@ export function ChatInterface({ communityId, currentUserId }: ChatInterfaceProps
 
     useEffect(() => {
         scrollToBottom()
-    }, [messages])
+    }, [messages, imagePreview])
 
     useEffect(() => {
         const fetchMessages = async () => {
@@ -129,35 +134,84 @@ export function ChatInterface({ communityId, currentUserId }: ChatInterfaceProps
         }
     }, []) // Empty dependency array
 
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error("File size must be less than 5MB")
+            return
+        }
+
+        setSelectedImage(file)
+        const previewUrl = URL.createObjectURL(file)
+        setImagePreview(previewUrl)
+
+        // Reset input value so same file can be selected again if needed
+        e.target.value = ''
+    }
+
+    const removeSelectedImage = () => {
+        setSelectedImage(null)
+        if (imagePreview) {
+            URL.revokeObjectURL(imagePreview)
+            setImagePreview(null)
+        }
+    }
+
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!newMessage.trim() || sending) return
+        if ((!newMessage.trim() && !selectedImage) || sending) return
 
         setSending(true)
         const msgContent = newMessage.trim()
+        let imageUrl = null
 
         try {
+            // 0. Upload Image if present
+            if (selectedImage) {
+                setUploading(true)
+                const fileExt = selectedImage.name.split('.').pop()
+                const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+                const filePath = `${communityId}/${fileName}`
+
+                const { error: uploadError } = await supabase.storage
+                    .from('community-images')
+                    .upload(filePath, selectedImage)
+
+                if (uploadError) throw uploadError
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from('community-images')
+                    .getPublicUrl(filePath)
+
+                imageUrl = publicUrl
+                setUploading(false)
+            }
+
             // 1. Optimistically fetch user profile to display immediately
-            const { data: { user } } = await supabase.auth.getUser()
+            // const { data: { user } } = await supabase.auth.getUser() 
 
             // We can try to get profile from existing messages if available, or fetch it
             // For speed, let's just insert and wait for the verify, OR insert and append manually.
 
+            const messageData = {
+                community_id: communityId,
+                user_id: currentUserId,
+                content: msgContent || (imageUrl ? 'Shared an image' : ''),
+                image_url: imageUrl
+            }
+
             const { data: insertedMsg, error } = await supabase
                 .from('community_messages')
-                .insert([
-                    {
-                        community_id: communityId,
-                        user_id: currentUserId,
-                        content: msgContent,
-                    },
-                ])
+                .insert([messageData])
                 .select()
                 .single()
 
             if (error) throw error
 
             setNewMessage('')
+            removeSelectedImage()
 
             // 2. Fetch profile to display with the new message
             const { data: profileData } = await supabase
@@ -182,6 +236,8 @@ export function ChatInterface({ communityId, currentUserId }: ChatInterfaceProps
 
         } catch (error) {
             console.error('Error sending message:', error)
+            toast.error('Failed to send message')
+            setUploading(false)
         } finally {
             setSending(false)
         }
@@ -201,9 +257,9 @@ export function ChatInterface({ communityId, currentUserId }: ChatInterfaceProps
                             className={`flex gap-3 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}
                         >
                             {!isMe && showHeader && (
-                                <div className="w-8 h-8 rounded-full bg-purple-900/50 border border-purple-500/30 flex items-center justify-center text-xs font-bold text-purple-200 shrink-0">
+                                <div className="w-8 h-8 rounded-full bg-purple-900/50 border border-purple-500/30 flex items-center justify-center text-xs font-bold text-purple-200 shrink-0 overflow-hidden">
                                     {msg.profiles?.avatar_url ? (
-                                        <img src={msg.profiles.avatar_url} alt={msg.profiles.username} className="w-full h-full rounded-full object-cover" />
+                                        <img src={msg.profiles.avatar_url} alt={msg.profiles.username} className="w-full h-full object-cover" />
                                     ) : (
                                         (msg.profiles?.username?.[0] || 'U').toUpperCase()
                                     )}
@@ -218,12 +274,22 @@ export function ChatInterface({ communityId, currentUserId }: ChatInterfaceProps
                                     </span>
                                 )}
                                 <div
-                                    className={`rounded-2xl px-4 py-2 text-sm ${isMe
+                                    className={`rounded-2xl px-4 py-2 text-sm space-y-2 ${isMe
                                         ? 'bg-purple-600 text-white rounded-tr-sm'
                                         : 'bg-slate-800 text-slate-200 rounded-tl-sm'
                                         }`}
                                 >
-                                    <p className="break-words leading-relaxed">{msg.content}</p>
+                                    {msg.image_url && (
+                                        <div className="rounded-lg overflow-hidden my-1 max-w-full">
+                                            <img
+                                                src={msg.image_url}
+                                                alt="Shared content"
+                                                className="max-w-full h-auto object-cover max-h-64 rounded-lg cursor-pointer hover:opacity-95 transition-opacity"
+                                                onClick={() => window.open(msg.image_url, '_blank')}
+                                            />
+                                        </div>
+                                    )}
+                                    {msg.content && <p className="break-words leading-relaxed">{msg.content}</p>}
                                 </div>
                                 <span className={`text-[10px] mt-1 opacity-50 ${isMe ? 'text-purple-200' : 'text-slate-500'}`}>
                                     {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -237,20 +303,57 @@ export function ChatInterface({ communityId, currentUserId }: ChatInterfaceProps
 
             {/* Input Area */}
             <div className="p-4 border-t border-slate-800 bg-slate-900">
-                <form onSubmit={handleSendMessage} className="flex gap-2">
+                {imagePreview && (
+                    <div className="mb-3 relative inline-block">
+                        <div className="relative rounded-lg overflow-hidden border border-slate-700 w-24 h-24 group">
+                            <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-white hover:text-red-400 h-8 w-8 rounded-full bg-black/50 hover:bg-black/70"
+                                    onClick={removeSelectedImage}
+                                >
+                                    <X className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <form onSubmit={handleSendMessage} className="flex gap-2 items-end">
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleFileSelect}
+                    />
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="text-slate-400 hover:text-white shrink-0"
+                        onClick={() => fileInputRef.current?.click()}
+                        title="Upload Image"
+                    >
+                        <ImageIcon className="w-5 h-5" />
+                    </Button>
+
                     <Input
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
                         placeholder="Type a message..."
-                        className="flex-1 bg-slate-800 border-slate-700 text-white"
+                        className="flex-1 bg-slate-800 border-slate-700 text-white min-h-[40px]"
                         disabled={sending}
                     />
                     <Button
                         type="submit"
-                        disabled={sending || !newMessage.trim()}
-                        className="bg-purple-600 hover:bg-purple-700"
+                        disabled={sending || (!newMessage.trim() && !selectedImage)}
+                        className="bg-purple-600 hover:bg-purple-700 shrink-0"
                     >
-                        <Send className="w-4 h-4" />
+                        {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     </Button>
                 </form>
             </div>

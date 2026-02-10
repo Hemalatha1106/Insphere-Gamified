@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { ChatInterface } from '@/components/community/chat-interface'
+import { ChannelList } from '@/components/community/channel-list'
+import { ChannelChat } from '@/components/community/channel-chat'
 import { CommunityLeaderboard } from '@/components/community/community-leaderboard'
 import { Loader2, Users, Lock, Unlock, Settings, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
@@ -38,6 +39,7 @@ export default function CommunityClassroomPage() {
     const [error, setError] = useState<string | null>(null)
     const [inviteCode, setInviteCode] = useState('')
     const [showInviteInput, setShowInviteInput] = useState(false)
+    const [selectedChannel, setSelectedChannel] = useState<{ id: string, name: string } | null>(null)
 
     useEffect(() => {
         const fetchData = async () => {
@@ -154,9 +156,9 @@ export default function CommunityClassroomPage() {
     const isAdmin = member?.role === 'admin'
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+        <div className="h-screen flex flex-col bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 overflow-hidden">
             {/* Header */}
-            <div className="bg-slate-900/50 border-b border-slate-800 p-6">
+            <div className="flex-none bg-slate-900/50 border-b border-slate-800 p-6">
                 <div className="max-w-7xl mx-auto">
                     <Link href="/community" className="text-slate-400 hover:text-white flex items-center mb-4 text-sm">
                         <ArrowLeft className="w-4 h-4 mr-1" />
@@ -222,56 +224,78 @@ export default function CommunityClassroomPage() {
             </div>
 
             {/* Content */}
-            <div className="max-w-7xl mx-auto p-6">
-                {isMember ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                        {/* Sidebar (Leaderboard) */}
-                        <div className="hidden lg:block col-span-1 space-y-6">
-                            <CommunityLeaderboard communityId={community.id} />
-                        </div>
-
-                        {/* Main Chat Area */}
-                        <div className="col-span-1 lg:col-span-3">
-                            <ChatInterface communityId={community.id} currentUserId={user.id} />
-                        </div>
-                    </div>
-                ) : (
-                    <div className="flex flex-col items-center justify-center py-20 bg-slate-900/30 border border-slate-800 rounded-lg border-dashed">
-                        {community.type === 'private' ? (
-                            <Lock className="w-12 h-12 text-yellow-500 mb-4" />
-                        ) : (
-                            <Unlock className="w-12 h-12 text-slate-600 mb-4" />
-                        )}
-                        <h2 className="text-xl font-bold text-white mb-2">Restricted Access</h2>
-                        <p className="text-slate-400 mb-6 text-center max-w-md">
-                            {community.type === 'private'
-                                ? 'This is a private community. You need an invite code to join.'
-                                : 'You need to join this community to view the messages and resources.'}
-                        </p>
-
-                        <div className="flex flex-col gap-3 w-full max-w-xs">
-                            {showInviteInput && (
-                                <input
-                                    type="text"
-                                    placeholder="Enter invite code"
-                                    value={inviteCode}
-                                    onChange={(e) => setInviteCode(e.target.value)}
-                                    className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-md text-white text-center focus:outline-none focus:border-purple-500"
+            <div className="flex-1 overflow-hidden w-full">
+                <div className="max-w-7xl mx-auto h-full p-4 md:p-6">
+                    {isMember ? (
+                        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4 h-full">
+                            {/* 1. Left Sidebar: Channels */}
+                            <div className="hidden md:block col-span-1 h-full min-h-0">
+                                <ChannelList
+                                    communityId={community.id}
+                                    selectedChannelId={selectedChannel?.id || null}
+                                    onSelectChannel={setSelectedChannel}
+                                    isAdmin={true} // Allow creation for everyone for now as per user request
                                 />
-                            )}
-                            <Button
-                                onClick={handleJoin}
-                                disabled={joining}
-                                className="bg-purple-600 hover:bg-purple-700 w-full"
-                            >
-                                {joining ? 'Joining...' : (showInviteInput ? 'Submit Code' : 'Join to View')}
-                            </Button>
-                            {error && (
-                                <p className="text-red-400 text-sm text-center">{error}</p>
-                            )}
+                            </div>
+
+                            {/* 2. Main Area: Chat */}
+                            <div className="col-span-1 md:col-span-3 lg:col-span-3 h-full min-h-0">
+                                {selectedChannel ? (
+                                    <ChannelChat
+                                        channelId={selectedChannel.id}
+                                        channelName={selectedChannel.name}
+                                        currentUserId={user.id}
+                                    />
+                                ) : (
+                                    <div className="h-full flex items-center justify-center bg-slate-900/30 border border-slate-800 rounded-lg text-slate-500">
+                                        Select a channel to start chatting
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 3. Right Sidebar: Leaderboard (Hidden on smaller screens, shown on large) */}
+                            <div className="hidden lg:block col-span-1 h-full overflow-y-auto min-h-0">
+                                <CommunityLeaderboard communityId={community.id} />
+                            </div>
                         </div>
-                    </div>
-                )}
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-20 bg-slate-900/30 border border-slate-800 rounded-lg border-dashed">
+                            {community.type === 'private' ? (
+                                <Lock className="w-12 h-12 text-yellow-500 mb-4" />
+                            ) : (
+                                <Unlock className="w-12 h-12 text-slate-600 mb-4" />
+                            )}
+                            <h2 className="text-xl font-bold text-white mb-2">Restricted Access</h2>
+                            <p className="text-slate-400 mb-6 text-center max-w-md">
+                                {community.type === 'private'
+                                    ? 'This is a private community. You need an invite code to join.'
+                                    : 'You need to join this community to view the messages and resources.'}
+                            </p>
+
+                            <div className="flex flex-col gap-3 w-full max-w-xs">
+                                {showInviteInput && (
+                                    <input
+                                        type="text"
+                                        placeholder="Enter invite code"
+                                        value={inviteCode}
+                                        onChange={(e) => setInviteCode(e.target.value)}
+                                        className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-md text-white text-center focus:outline-none focus:border-purple-500"
+                                    />
+                                )}
+                                <Button
+                                    onClick={handleJoin}
+                                    disabled={joining}
+                                    className="bg-purple-600 hover:bg-purple-700 w-full"
+                                >
+                                    {joining ? 'Joining...' : (showInviteInput ? 'Submit Code' : 'Join to View')}
+                                </Button>
+                                {error && (
+                                    <p className="text-red-400 text-sm text-center">{error}</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     )

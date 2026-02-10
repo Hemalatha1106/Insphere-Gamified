@@ -10,13 +10,32 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { FollowButton } from '@/components/profile/follow-button'
 
+import { Badge as BadgeIcon } from 'lucide-react'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+
+interface Badge {
+  id: string
+  name: string
+  description: string
+  category: string
+  points_value: number
+  icon_url?: string
+}
+
 interface ProfileCardProps {
   user?: User
   profile: any
   isOwnProfile?: boolean
+  badges?: Badge[]
+  earnedBadgeIds?: string[]
 }
 
-export function ProfileCard({ user, profile, isOwnProfile = true }: ProfileCardProps) {
+export function ProfileCard({ user, profile, isOwnProfile = true, badges = [], earnedBadgeIds = [] }: ProfileCardProps) {
   // Use profile avatar or fallback to user metadata or initial
   const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url
   const displayName = profile?.display_name || user?.user_metadata?.display_name || 'Coder'
@@ -255,6 +274,46 @@ export function ProfileCard({ user, profile, isOwnProfile = true }: ProfileCardP
             </div>
           </div>
         </div>
+
+        {/* Badges Row */}
+        {earnedBadgeIds.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            <TooltipProvider>
+              {badges
+                .filter(b => earnedBadgeIds.includes(b.id))
+                .slice(0, 5) // Show top 5
+                .map(badge => (
+                  <Tooltip key={badge.id}>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-1.5 px-2 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded-full cursor-help hover:bg-yellow-500/20 transition-colors">
+                        <span className="text-sm">
+                          {{
+                            achievement: '🏆',
+                            contest: '🎯',
+                            community: '👥',
+                            level: '⭐',
+                            integration: '🔗',
+                            consistency: '🔥',
+                          }[badge.category] || '🎖️'}
+                        </span>
+                        <span className="text-xs font-medium text-yellow-500">{badge.name}</span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="font-bold">{badge.name}</p>
+                      <p className="text-xs text-slate-400">{badge.description}</p>
+                      <p className="text-xs text-yellow-500 mt-1">+{badge.points_value} pts</p>
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+            </TooltipProvider>
+            {earnedBadgeIds.length > 5 && (
+              <div className="flex items-center justify-center px-2 py-1 bg-slate-800 rounded-full border border-slate-700">
+                <span className="text-xs text-slate-400">+{earnedBadgeIds.length - 5} more</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Links / Socials Row */}
         <div className="flex gap-3 mb-6">
