@@ -225,7 +225,9 @@ function MessagesContent() {
           }
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        console.log("Realtime Message Subscription Status:", status)
+      })
 
     return () => {
       supabase.removeChannel(channel)
