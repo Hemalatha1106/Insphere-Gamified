@@ -20,6 +20,8 @@ export const viewport: Viewport = {
   themeColor: '#0f172a',
 }
 
+import { Toaster } from "@/components/ui/toaster"
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -29,6 +31,7 @@ export default function RootLayout({
     <html lang="en" className="scroll-smooth">
       <body className={`${inter.variable} ${jetbrains.variable} font-sans bg-slate-950 text-slate-100 antialiased`}>
         {children}
+        <Toaster />
       </body>
     </html>
   )

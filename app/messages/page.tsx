@@ -3,17 +3,18 @@
 import React from "react"
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Send, Search, Plus, ArrowLeft } from 'lucide-react'
+import { Send, Search, Plus, ArrowLeft, MessageCircle, Loader2 } from 'lucide-react'
 
 interface Conversation {
   id: string
   username: string
   display_name: string
+  avatar_url?: string
   last_message: string
   last_message_time: string
   unread_count: number
@@ -70,49 +71,227 @@ const MOCK_CONVERSATIONS: Conversation[] = [
 
 export default function MessagesPage() {
   const [user, setUser] = useState<any>(null)
-  const [conversations, setConversations] = useState<Conversation[]>(MOCK_CONVERSATIONS)
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(MOCK_CONVERSATIONS[0])
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const targetUserId = searchParams.get('userId')
   const supabase = createClient()
+  const messagesEndRef = React.useRef<HTMLDivElement>(null)
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
+    scrollToBottom()
+  }, [messages])
 
+  // 1. Auth & Initial Load
+  useEffect(() => {
+    const checkAuthAndLoad = async () => {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
       if (!authUser) {
         router.push('/auth/login')
         return
       }
-
       setUser(authUser)
+
+      // Fetch friends to build conversation list
+      // Friends are where status = 'accepted' AND (sender_id = me OR receiver_id = me)
+      const { data: requests, error } = await supabase
+        .from('friend_requests')
+        .select(`
+          id,
+          sender_id,
+          receiver_id,
+          sender:profiles!sender_id(id, username, display_name, avatar_url),
+          receiver:profiles!receiver_id(id, username, display_name, avatar_url)
+        `)
+        .eq('status', 'accepted')
+        .or(`sender_id.eq.${authUser.id},receiver_id.eq.${authUser.id}`)
+
+      if (requests) {
+        // Fetch unread counts
+        const { data: unreadData } = await supabase
+          .from('messages')
+          .select('sender_id')
+          .eq('recipient_id', authUser.id)
+          .eq('is_read', false)
+
+        const unreadCounts: Record<string, number> = {}
+        unreadData?.forEach((msg: any) => {
+          unreadCounts[msg.sender_id] = (unreadCounts[msg.sender_id] || 0) + 1
+        })
+
+        const formattedConversations: Conversation[] = requests.map((req: any) => {
+          const isSender = req.sender_id === authUser.id
+          const friendProfile = isSender ? req.receiver : req.sender
+          // Generate a deterministic color based on ID
+          const colors = ['from-blue-500 to-cyan-500', 'from-purple-500 to-pink-500', 'from-green-500 to-emerald-500', 'from-orange-500 to-red-500', 'from-yellow-500 to-orange-500']
+          const colorIndex = friendProfile.id.charCodeAt(0) % colors.length
+
+          return {
+            id: friendProfile.id,
+            username: friendProfile.username,
+            display_name: friendProfile.display_name,
+            avatar_url: friendProfile.avatar_url,
+            last_message: 'Start chatting', // Todo: fetch last message
+            last_message_time: '',
+            unread_count: unreadCounts[friendProfile.id] || 0,
+            avatar_color: colors[colorIndex]
+          }
+        })
+        setConversations(formattedConversations)
+
+        // If URL has userId, select that conversation
+        if (targetUserId) {
+          const target = formattedConversations.find(c => c.id === targetUserId)
+          if (target) setSelectedConversation(target)
+        } else if (formattedConversations.length > 0 && !selectedConversation) {
+          // Optional: Select first one by default? No, let user choose.
+        }
+      }
       setLoading(false)
     }
 
-    checkAuth()
-  }, [router, supabase])
+    checkAuthAndLoad()
+  }, [router, supabase, targetUserId])
+
+  // 2. Fetch Messages when Conversation Selected
+  useEffect(() => {
+    if (!selectedConversation || !user) return
+
+    const fetchMessages = async () => {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`and(sender_id.eq.${user.id},recipient_id.eq.${selectedConversation.id}),and(sender_id.eq.${selectedConversation.id},recipient_id.eq.${user.id})`)
+        .order('created_at', { ascending: true })
+
+      if (data) {
+        setMessages(data)
+
+        // Mark as read
+        const unreadIds = data.filter(m => m.sender_id === selectedConversation.id && !m.is_read).map(m => m.id)
+        if (unreadIds.length > 0) {
+          await supabase
+            .from('messages')
+            .update({ is_read: true })
+            .in('id', unreadIds)
+
+          // Update local state to clear badge
+          setConversations(prev => prev.map(c => {
+            if (c.id === selectedConversation.id) {
+              return { ...c, unread_count: 0 }
+            }
+            return c
+          }))
+        }
+      }
+    }
+
+    fetchMessages()
+
+    // 3. Realtime Subscription
+    const channel = supabase
+      .channel('messages_channel')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `recipient_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const newMsg = payload.new as Message
+          // If message is from current conversation, append it
+          if (selectedConversation && newMsg.sender_id === selectedConversation.id) {
+            setMessages(prev => [...prev, newMsg])
+            // Mark as read immediately? Or let the effect handle it?
+            // Effect will handle if we trigger it, but for now we rely on user action or selecting.
+            // Actually, we should probably mark it read if we are viewing it.
+          } else {
+            // Increment unread count for that conversation
+            setConversations(prev => prev.map(c => {
+              if (c.id === newMsg.sender_id) {
+                return { ...c, unread_count: c.unread_count + 1 }
+              }
+              return c
+            }))
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `sender_id=eq.${user.id}`,
+        },
+        (payload) => {
+          // Also listen to my own sent messages if sent from another tab/device
+          const newMsg = payload.new as Message
+          if (newMsg.recipient_id === selectedConversation.id) {
+            // Check if we already added it optimistically to avoid dupe? 
+            // For simplicity, we can rely on optimism or dedupe by ID.
+            setMessages(prev => {
+              if (prev.some(m => m.id === newMsg.id)) return prev
+              return [...prev, newMsg]
+            })
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [selectedConversation, user, supabase])
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newMessage.trim() || !selectedConversation || !user) return
 
-    // Mock message
-    const message: Message = {
-      id: Math.random().toString(),
+    const content = newMessage.trim()
+    setNewMessage('') // Clear input immediately
+
+    // Optimistic Update
+    const optimisticMessage: Message = {
+      id: Math.random().toString(), // Temp ID
       sender_id: user.id,
       recipient_id: selectedConversation.id,
-      content: newMessage,
+      content: content,
       created_at: new Date().toISOString(),
       is_read: false,
     }
+    setMessages(prev => [...prev, optimisticMessage])
 
-    setMessages([...messages, message])
-    setNewMessage('')
+    // Send to DB
+    const { data, error } = await supabase
+      .from('messages')
+      .insert([{
+        sender_id: user.id,
+        recipient_id: selectedConversation.id,
+        content: content
+      }])
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error sending message:', error)
+      // Rollback optimistic update implementation omitted for brevity, but recommended
+    } else if (data) {
+      // Replace temp ID with real one? 
+      // Actual subscription might handle it, or we just update state
+      setMessages(prev => prev.map(m => m.id === optimisticMessage.id ? data : m))
+    }
   }
 
   const filteredConversations = conversations.filter((conv) =>
@@ -120,38 +299,11 @@ export default function MessagesPage() {
     conv.username.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const MOCK_MESSAGES: Message[] = [
-    {
-      id: '1',
-      sender_id: selectedConversation?.id || 'user1',
-      recipient_id: user?.id || 'me',
-      content: 'Hey! How are you doing with your competitive programming journey?',
-      created_at: '2024-01-15T10:00:00Z',
-      is_read: true,
-    },
-    {
-      id: '2',
-      sender_id: user?.id || 'me',
-      recipient_id: selectedConversation?.id || 'user1',
-      content: 'Great! Just solved a few problems on LeetCode. How about you?',
-      created_at: '2024-01-15T10:05:00Z',
-      is_read: true,
-    },
-    {
-      id: '3',
-      sender_id: selectedConversation?.id || 'user1',
-      recipient_id: user?.id || 'me',
-      content: 'That binary search solution was perfect!',
-      created_at: '2024-01-15T10:10:00Z',
-      is_read: true,
-    },
-  ]
-
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-purple-500/20 border-t-purple-500 rounded-full animate-spin mx-auto mb-4" />
+          <Loader2 className="w-12 h-12 text-purple-500 animate-spin mx-auto mb-4" />
           <p className="text-slate-400">Loading messages...</p>
         </div>
       </div>
@@ -190,64 +342,75 @@ export default function MessagesPage() {
       {/* Main Chat Interface */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 h-[calc(100vh-120px)] flex gap-4">
         {/* Conversations Sidebar */}
-        <div className="w-full md:w-80 bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-lg flex flex-col overflow-hidden">
+        <div className={`w-full md:w-80 bg-slate-900/50 border border-slate-800 rounded-lg flex flex-col overflow-hidden ${selectedConversation ? 'hidden md:flex' : 'flex'}`}>
           {/* Header */}
-          <div className="p-4 border-b border-slate-700">
+          <div className="p-4 border-b border-slate-800">
             <h2 className="text-xl font-bold text-white mb-3">Messages</h2>
             <div className="relative mb-3">
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
               <input
                 type="text"
-                placeholder="Search users..."
+                placeholder="Search friends..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
               />
             </div>
-            <Button size="sm" className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-sm">
-              <Plus className="w-4 h-4 mr-2" />
-              New Chat
-            </Button>
           </div>
 
           {/* Conversations List */}
           <div className="flex-1 overflow-y-auto space-y-1 p-3">
-            {filteredConversations.map((conv) => (
-              <button
-                key={conv.id}
-                onClick={() => {
-                  setSelectedConversation(conv)
-                  setMessages(MOCK_MESSAGES)
-                }}
-                className={`w-full p-3 rounded-lg text-left transition ${selectedConversation?.id === conv.id
-                  ? 'bg-gradient-to-r from-purple-600/50 to-pink-600/50 border border-purple-400/50'
-                  : 'hover:bg-slate-700'
-                  }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${conv.avatar_color} flex-shrink-0`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">{conv.display_name}</p>
-                    <p className="text-xs text-slate-400 truncate">{conv.last_message}</p>
+            {filteredConversations.length === 0 ? (
+              <div className="text-center py-8 text-slate-500 text-sm">
+                No friends found.<br />Add friends to start chatting!
+              </div>
+            ) : (
+              filteredConversations.map((conv) => (
+                <button
+                  key={conv.id}
+                  onClick={() => {
+                    setSelectedConversation(conv)
+                  }}
+                  className={`w-full p-3 rounded-lg text-left transition ${selectedConversation?.id === conv.id
+                    ? 'bg-purple-900/20 border border-purple-500/30'
+                    : 'hover:bg-slate-800'
+                    }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${conv.avatar_color} relative overflow-hidden`}>
+                      {conv.avatar_url && <img src={conv.avatar_url} alt="" className="w-full h-full object-cover" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{conv.display_name}</p>
+                      <p className="text-xs text-slate-400 truncate">@{conv.username}</p>
+                    </div>
+                    {conv.unread_count > 0 && (
+                      <span className="flex-shrink-0 bg-purple-500 rounded-full w-2.5 h-2.5 shadow-[0_0_10px_rgba(168,85,247,0.5)]" />
+                    )}
                   </div>
-                  {conv.unread_count > 0 && (
-                    <span className="flex-shrink-0 bg-pink-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                      {conv.unread_count}
-                    </span>
-                  )}
-                </div>
-              </button>
-            ))}
+                </button>
+              ))
+            )}
           </div>
         </div>
 
         {/* Chat Area */}
-        <div className="hidden md:flex flex-1 flex-col bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-lg overflow-hidden">
+        <div className={`flex-1 flex-col bg-slate-900/50 border border-slate-800 rounded-lg overflow-hidden ${selectedConversation ? 'flex' : 'hidden md:flex'}`}>
           {selectedConversation ? (
             <>
               {/* Chat Header */}
-              <div className="p-4 border-b border-slate-700 flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${selectedConversation.avatar_color}`} />
+              <div className="p-4 border-b border-slate-800 flex items-center gap-3 bg-slate-900/80">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden text-slate-400 mr-2"
+                  onClick={() => setSelectedConversation(null)}
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${selectedConversation.avatar_color} overflow-hidden`}>
+                  {selectedConversation.avatar_url && <img src={selectedConversation.avatar_url} alt="" className="w-full h-full object-cover" />}
+                </div>
                 <div>
                   <p className="font-medium text-white">{selectedConversation.display_name}</p>
                   <p className="text-xs text-slate-400">@{selectedConversation.username}</p>
@@ -256,45 +419,58 @@ export default function MessagesPage() {
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {(messages.length > 0 ? messages : MOCK_MESSAGES).map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-xs px-4 py-2 rounded-lg ${msg.sender_id === user?.id
-                        ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
-                        : 'bg-slate-700 text-slate-100'
-                        }`}
-                    >
-                      <p className="text-sm">{msg.content}</p>
-                      <p className={`text-xs mt-1 ${msg.sender_id === user?.id ? 'text-purple-100' : 'text-slate-400'}`}>
-                        {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    </div>
+                {messages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-slate-500 opacity-50">
+                    <MessageCircle className="w-12 h-12 mb-2" />
+                    <p>No messages yet.</p>
+                    <p className="text-sm">Say hello to {selectedConversation.display_name}!</p>
                   </div>
-                ))}
+                ) : (
+                  messages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-[80%] md:max-w-md px-4 py-2 rounded-2xl ${msg.sender_id === user?.id
+                          ? 'bg-purple-600 text-white rounded-br-none'
+                          : 'bg-slate-800 text-slate-200 rounded-bl-none'
+                          }`}
+                      >
+                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                        <p className={`text-[10px] mt-1 text-right ${msg.sender_id === user?.id ? 'text-purple-200' : 'text-slate-500'}`}>
+                          {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+                <div ref={messagesEndRef} />
               </div>
 
               {/* Input */}
-              <div className="p-4 border-t border-slate-700">
+              <div className="p-4 border-t border-slate-800 bg-slate-900/80">
                 <form onSubmit={handleSendMessage} className="flex gap-2">
                   <Input
                     type="text"
                     placeholder="Type a message..."
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    className="bg-slate-700 border-slate-600 text-white placeholder-slate-500"
+                    className="bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus-visible:ring-purple-500"
                   />
-                  <Button type="submit" className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 px-4">
+                  <Button type="submit" className="bg-purple-600 hover:bg-purple-700 shadow-lg shadow-purple-500/20 px-4" disabled={!newMessage.trim()}>
                     <Send className="w-4 h-4" />
                   </Button>
                 </form>
               </div>
             </>
           ) : (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-slate-400">Select a conversation to start chatting</p>
+            <div className="flex flex-col items-center justify-center h-full text-slate-500">
+              <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-4">
+                <MessageCircle className="w-8 h-8 text-slate-600" />
+              </div>
+              <p className="text-lg font-medium text-slate-400">Your Messages</p>
+              <p className="text-sm text-slate-500 mt-2">Select a friend to start chatting</p>
             </div>
           )}
         </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { User } from '@supabase/supabase-js'
-import { Trophy, Zap, MapPin, Calendar, Edit3, Link as LinkIcon, Github, Twitter, Linkedin, Loader2 } from 'lucide-react'
+import { Trophy, Zap, MapPin, Calendar, Edit3, Link as LinkIcon, Github, Twitter, Linkedin, Loader2, UserPlus, UserCheck, UserMinus, MessageCircle } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -31,25 +31,90 @@ export function ProfileCard({ user, profile, isOwnProfile = true }: ProfileCardP
 
   // State for checking if we follow this user
   const [isFollowing, setIsFollowing] = useState(false)
+  const [friendStatus, setFriendStatus] = useState<'none' | 'pending_sent' | 'pending_received' | 'friends'>('none')
+  const [loadingFriendAction, setLoadingFriendAction] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
     if (!isOwnProfile && profile?.id) {
-      const checkFollowStatus = async () => {
+      const checkStatus = async () => {
         const { data: { user: currentUser } } = await supabase.auth.getUser()
         if (currentUser) {
-          const { data } = await supabase
+          // Check follow status
+          const { data: followData } = await supabase
             .from('follows')
             .select('*')
             .eq('follower_id', currentUser.id)
             .eq('following_id', profile.id)
             .maybeSingle()
-          setIsFollowing(!!data)
+          setIsFollowing(!!followData)
+
+          // Check friend status
+          // Sent request?
+          const { data: sentRequest } = await supabase
+            .from('friend_requests')
+            .select('*')
+            .eq('sender_id', currentUser.id)
+            .eq('receiver_id', profile.id)
+            .maybeSingle()
+
+          if (sentRequest) {
+            setFriendStatus(sentRequest.status === 'accepted' ? 'friends' : 'pending_sent')
+            return
+          }
+
+          // Received request?
+          const { data: receivedRequest } = await supabase
+            .from('friend_requests')
+            .select('*')
+            .eq('sender_id', profile.id)
+            .eq('receiver_id', currentUser.id)
+            .maybeSingle()
+
+          if (receivedRequest) {
+            setFriendStatus(receivedRequest.status === 'accepted' ? 'friends' : 'pending_received')
+          }
         }
       }
-      checkFollowStatus()
+      checkStatus()
     }
   }, [isOwnProfile, profile?.id, supabase])
+
+  const handleFriendAction = async (action: 'send' | 'accept' | 'remove') => {
+    try {
+      setLoadingFriendAction(true)
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      if (!currentUser) return
+
+      if (action === 'send') {
+        const { error } = await supabase
+          .from('friend_requests')
+          .insert([{ sender_id: currentUser.id, receiver_id: profile.id }])
+        if (error) throw error
+        setFriendStatus('pending_sent')
+      } else if (action === 'accept') {
+        const { error } = await supabase
+          .from('friend_requests')
+          .update({ status: 'accepted' })
+          .eq('sender_id', profile.id)
+          .eq('receiver_id', currentUser.id)
+        if (error) throw error
+        setFriendStatus('friends')
+      } else if (action === 'remove') {
+        // Delete any relationship
+        const { error } = await supabase
+          .from('friend_requests')
+          .delete()
+          .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${profile.id}),and(sender_id.eq.${profile.id},receiver_id.eq.${currentUser.id})`)
+        if (error) throw error
+        setFriendStatus('none')
+      }
+    } catch (error) {
+      console.error('Error updating friend status:', error)
+    } finally {
+      setLoadingFriendAction(false)
+    }
+  }
 
   return (
     <div className="group relative overflow-hidden bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl transition-all hover:border-purple-500/30">
@@ -102,10 +167,73 @@ export function ProfileCard({ user, profile, isOwnProfile = true }: ProfileCardP
                   </Button>
                 </Link>
               ) : (
-                <FollowButton
-                  targetUserId={profile.id}
-                  initialIsFollowing={isFollowing}
-                />
+                <div className="flex gap-2">
+                  <FollowButton
+                    targetUserId={profile.id}
+                    initialIsFollowing={isFollowing}
+                  />
+
+                  {friendStatus === 'none' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-purple-500/50 text-purple-400 hover:bg-purple-500/10"
+                      onClick={() => handleFriendAction('send')}
+                      disabled={loadingFriendAction}
+                    >
+                      {loadingFriendAction ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4 mr-2" />}
+                      Add Friend
+                    </Button>
+                  )}
+
+                  {friendStatus === 'pending_sent' && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled
+                      className="opacity-70"
+                    >
+                      <UserCheck className="w-4 h-4 mr-2" />
+                      Request Sent
+                    </Button>
+                  )}
+
+                  {friendStatus === 'pending_received' && (
+                    <Button
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700"
+                      onClick={() => handleFriendAction('accept')}
+                      disabled={loadingFriendAction}
+                    >
+                      {loadingFriendAction ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4 mr-2" />}
+                      Accept Request
+                    </Button>
+                  )}
+
+                  {friendStatus === 'friends' && (
+                    <>
+                      <Link href={`/messages?userId=${profile.id}`}>
+                        <Button
+                          size="sm"
+                          className="bg-purple-600 hover:bg-purple-700"
+                        >
+                          <MessageCircle className="w-4 h-4 mr-2" />
+                          Message
+                        </Button>
+                      </Link>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                        onClick={() => handleFriendAction('remove')}
+                        title="Unfriend"
+                        disabled={loadingFriendAction}
+                      >
+                        <UserMinus className="w-4 h-4" />
+                      </Button>
+                    </>
+                  )}
+                </div>
               )}
             </div>
 

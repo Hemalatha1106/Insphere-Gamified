@@ -14,16 +14,18 @@ A gamified social platform for tracking competitive programming progress across 
 - **Badges & Achievements**: Unlock special badges for achievements like "Century Club", "Problem Slayer", and "Streak Master"
 - **Leaderboards**: Compete globally and see where you rank among other competitive programmers
 
-### Community Features
+### Community & Social
+- **Friend System**: Send and accept friend requests to build your network
+- **Direct Messaging**: Real-time chat with friends with unread indicators and toast notifications
+- **Private Communities**: Create invite-only groups with access codes
 - **Discover Users**: Find and follow other competitive programmers
 - **Community Posts**: Share tips, achievements, and discuss strategies
-- **Category-based Posts**: Tips, achievements, discussions, and showcases
-- **User Profiles**: View other users' progress and stats
 
 ### Direct Messaging
-- **One-on-One Chat**: Private messaging with other community members
-- **Conversation History**: Keep track of all your conversations
-- **Real-time Updates**: See when new messages arrive
+- **Real-time Chat**: Instant message delivery with Supabase Realtime
+- **Friend-only Access**: Secure messaging only between connected friends
+- **Rich Notifications**: Toast popups for new messages and dashboard badges
+- **Unread Indicators**: Visual glowing dot indicators for unread conversations
 
 ### Progress Analytics
 - **Monthly Charts**: Visualize your problem-solving progress over time
@@ -63,9 +65,14 @@ A gamified social platform for tracking competitive programming progress across 
 
 3. **Run migrations** (if needed)
    Execute the SQL scripts in `/scripts` folder against your Supabase database:
-   - `001_tables.sql` - Creates all tables
-   - `002_rls_policies.sql` - Sets up Row Level Security
-   - `003_seed_badges.sql` - Seeds initial badges
+   - `001_initial_schema.sql` - Core tables (profiles, coding_stats, badges)
+   - `002_rls_policies.sql` - Row Level Security policies
+   - `003_seed_badges.sql` - Initial badge data
+   - `012_follow_system.sql` - Follow/Unfollow logic
+   - `013_fix_community_policies.sql` - Admin rights fixes
+   - `014_friend_system.sql` - Friend requests table and policies
+   - `015_fix_friend_references.sql` - FK fixes for friends
+   - `016_reset_unread_messages.sql` - Unread message state reset
 
 4. **Start development server**
    ```bash

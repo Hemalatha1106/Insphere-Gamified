@@ -16,6 +16,7 @@ interface Community {
     category: string
     type: 'public' | 'private'
     created_by: string
+    invite_code?: string
 }
 
 interface Member {
@@ -35,6 +36,8 @@ export default function CommunityClassroomPage() {
     const [loading, setLoading] = useState(true)
     const [joining, setJoining] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [inviteCode, setInviteCode] = useState('')
+    const [showInviteInput, setShowInviteInput] = useState(false)
 
     useEffect(() => {
         const fetchData = async () => {
@@ -83,11 +86,25 @@ export default function CommunityClassroomPage() {
 
     const handleJoin = async () => {
         if (!user || !community) return
+
+        // If private and input not shown, show input first
+        if (community.type === 'private' && !showInviteInput) {
+            setShowInviteInput(true)
+            return
+        }
+
+        // If private and input shown, verify code
+        if (community.type === 'private' && showInviteInput) {
+            if (inviteCode !== community.invite_code) {
+                setError('Invalid invite code')
+                return
+            }
+        }
+
         setJoining(true)
+        setError(null)
 
         try {
-            const status = community.type === 'public' ? 'approved' : 'pending' // Public auto-joins, Private needs approval if we had a request flow, but for now Public is instant.
-
             const { error } = await supabase
                 .from('community_members')
                 .insert([
@@ -95,7 +112,7 @@ export default function CommunityClassroomPage() {
                         community_id: community.id,
                         user_id: user.id,
                         role: 'member',
-                        status: 'approved' // Simplifying to approved for all public for now, can add request logic later
+                        status: 'approved'
                     }
                 ])
 
@@ -103,6 +120,7 @@ export default function CommunityClassroomPage() {
 
             // Refresh state
             setMember({ role: 'member', status: 'approved' })
+            setShowInviteInput(false)
         } catch (err: any) {
             console.error('Error joining:', err)
             setError(err.message)
@@ -173,13 +191,24 @@ export default function CommunityClassroomPage() {
                             )}
 
                             {!isMember && !isPending && (
-                                <Button
-                                    onClick={handleJoin}
-                                    disabled={joining}
-                                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-                                >
-                                    {joining ? 'Joining...' : 'Join Classroom'}
-                                </Button>
+                                <div className="flex flex-col gap-2">
+                                    {showInviteInput && (
+                                        <input
+                                            type="text"
+                                            placeholder="Enter invite code"
+                                            value={inviteCode}
+                                            onChange={(e) => setInviteCode(e.target.value)}
+                                            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-white text-sm focus:outline-none focus:border-purple-500"
+                                        />
+                                    )}
+                                    <Button
+                                        onClick={handleJoin}
+                                        disabled={joining}
+                                        className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                                    >
+                                        {joining ? 'Joining...' : (showInviteInput ? 'Submit Code' : 'Join Classroom')}
+                                    </Button>
+                                </div>
                             )}
 
                             {isPending && (
@@ -208,18 +237,39 @@ export default function CommunityClassroomPage() {
                     </div>
                 ) : (
                     <div className="flex flex-col items-center justify-center py-20 bg-slate-900/30 border border-slate-800 rounded-lg border-dashed">
-                        <Lock className="w-12 h-12 text-slate-600 mb-4" />
+                        {community.type === 'private' ? (
+                            <Lock className="w-12 h-12 text-yellow-500 mb-4" />
+                        ) : (
+                            <Unlock className="w-12 h-12 text-slate-600 mb-4" />
+                        )}
                         <h2 className="text-xl font-bold text-white mb-2">Restricted Access</h2>
                         <p className="text-slate-400 mb-6 text-center max-w-md">
-                            You need to join this community to view the messages and resources.
+                            {community.type === 'private'
+                                ? 'This is a private community. You need an invite code to join.'
+                                : 'You need to join this community to view the messages and resources.'}
                         </p>
-                        <Button
-                            onClick={handleJoin}
-                            disabled={joining}
-                            className="bg-purple-600 hover:bg-purple-700"
-                        >
-                            Join to View
-                        </Button>
+
+                        <div className="flex flex-col gap-3 w-full max-w-xs">
+                            {showInviteInput && (
+                                <input
+                                    type="text"
+                                    placeholder="Enter invite code"
+                                    value={inviteCode}
+                                    onChange={(e) => setInviteCode(e.target.value)}
+                                    className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-md text-white text-center focus:outline-none focus:border-purple-500"
+                                />
+                            )}
+                            <Button
+                                onClick={handleJoin}
+                                disabled={joining}
+                                className="bg-purple-600 hover:bg-purple-700 w-full"
+                            >
+                                {joining ? 'Joining...' : (showInviteInput ? 'Submit Code' : 'Join to View')}
+                            </Button>
+                            {error && (
+                                <p className="text-red-400 text-sm text-center">{error}</p>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>

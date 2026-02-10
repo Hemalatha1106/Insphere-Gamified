@@ -9,7 +9,9 @@ import { ProfileCard } from '@/components/dashboard/profile-card'
 import { CodingStatsCard } from '@/components/dashboard/coding-stats'
 import { BadgesShowcase } from '@/components/dashboard/badges-showcase'
 import { UserNav } from '@/components/dashboard/user-nav'
+import { NotificationsPopover } from '@/components/dashboard/notifications-popover'
 import { LogOut, Users, MessageSquare, TrendingUp } from 'lucide-react'
+import { useToast } from '@/components/ui/use-toast'
 
 interface Profile {
   id: string
@@ -36,10 +38,12 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [codingStats, setCodingStats] = useState<CodingStats[]>([])
   const [badges, setBadges] = useState<any[]>([])
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
+  const { toast } = useToast()
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -55,6 +59,67 @@ export default function DashboardPage() {
         }
 
         setUser(authUser)
+
+        // Fetch unread messages count
+        const { count, error: countError } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('recipient_id', authUser.id)
+          .eq('is_read', false)
+
+        if (!countError && count !== null) {
+          setUnreadMessageCount(count)
+        }
+
+        // Subscribe to new messages
+        const channel = supabase
+          .channel('dashboard_messages')
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'messages',
+              filter: `recipient_id=eq.${authUser.id}`,
+            },
+            (payload) => {
+              setUnreadMessageCount((prev) => prev + 1)
+
+              const newMessage = payload.new as any
+              // Fetch sender details for toast
+              supabase
+                .from('profiles')
+                .select('display_name, username')
+                .eq('id', newMessage.sender_id)
+                .single()
+                .then(({ data: sender }) => {
+                  if (sender) {
+                    toast({
+                      title: `New message from ${sender.display_name}`,
+                      description: newMessage.content.length > 50
+                        ? newMessage.content.substring(0, 50) + '...'
+                        : newMessage.content,
+                    })
+                  }
+                })
+            }
+          )
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'messages',
+              filter: `recipient_id=eq.${authUser.id}`,
+            },
+            (payload: any) => {
+              // If message marked as read, decrement
+              if (payload.old.is_read === false && payload.new.is_read === true) {
+                setUnreadMessageCount((prev) => Math.max(0, prev - 1))
+              }
+            }
+          )
+          .subscribe()
 
         // Fetch profile
         let { data: profileData, error: profileError } = await supabase
@@ -118,6 +183,11 @@ export default function DashboardPage() {
 
         if (badgesError) throw badgesError
         setBadges(badgesData || [])
+
+        return () => {
+          supabase.removeChannel(channel)
+        }
+
       } catch (err: any) {
         console.error('Dashboard error:', err)
         setError(err.message || 'An error occurred loading your dashboard')
@@ -161,10 +231,10 @@ export default function DashboardPage() {
     codingStats.length > 0
       ? codingStats
       : [
-        { platform: 'leetcode', total_problems: 1500, problems_solved: 287, contest_rating: 1850, level: 'Advanced' },
-        { platform: 'geeksforgeeks', total_problems: 2000, problems_solved: 450, contest_rating: 0, level: 'Intermediate' },
-        { platform: 'codeforces', total_problems: 5000, problems_solved: 120, contest_rating: 1400, level: 'Newbie' },
-        { platform: 'github', total_problems: 150, problems_solved: 45, contest_rating: 0, level: '45 Repos' },
+        { platform: 'leetcode', total_problems: 0, problems_solved: 0, contest_rating: 0, level: 'Beginner' },
+        { platform: 'geeksforgeeks', total_problems: 0, problems_solved: 0, contest_rating: 0, level: 'Beginner' },
+        { platform: 'codeforces', total_problems: 0, problems_solved: 0, contest_rating: 0, level: 'Newbie' },
+        { platform: 'github', total_problems: 0, problems_solved: 0, contest_rating: 0, level: 'No Repos' },
       ]
 
   return (
@@ -184,11 +254,16 @@ export default function DashboardPage() {
               </Button>
             </Link>
             <Link href="/messages">
-              <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white">
+              <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white relative">
                 <MessageSquare className="w-4 h-4 mr-2" />
                 Messages
+                {unreadMessageCount > 0 && (
+                  <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500 ring-2 ring-slate-950 animate-pulse" />
+                )}
               </Button>
             </Link>
+
+            <NotificationsPopover />
 
             {/* User Dropdown */}
             {user && <UserNav user={user} />}
