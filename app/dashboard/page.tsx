@@ -331,7 +331,7 @@ export default function DashboardPage() {
             <NotificationsPopover />
 
             {/* User Dropdown */}
-            {user && <UserNav user={user} />}
+            {user && <UserNav user={user} profile={profile} />}
           </div>
         </div>
       </nav>
@@ -346,6 +346,7 @@ export default function DashboardPage() {
               profile={profile}
               badges={badges}
               earnedBadgeIds={earnedBadgeIds}
+              codingStats={codingStats}
             />
           )}
         </section>

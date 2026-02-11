@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { FollowButton } from '@/components/profile/follow-button'
+import { LeetCodeHeatmap } from '@/components/dashboard/leetcode-heatmap'
 
 import { Badge as BadgeIcon } from 'lucide-react'
 import {
@@ -33,9 +34,10 @@ interface ProfileCardProps {
   isOwnProfile?: boolean
   badges?: Badge[]
   earnedBadgeIds?: string[]
+  codingStats?: any[]
 }
 
-export function ProfileCard({ user, profile, isOwnProfile = true, badges = [], earnedBadgeIds = [] }: ProfileCardProps) {
+export function ProfileCard({ user, profile, isOwnProfile = true, badges = [], earnedBadgeIds = [], codingStats = [] }: ProfileCardProps) {
   // Use profile avatar or fallback to user metadata or initial
   const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url
   const displayName = profile?.display_name || user?.user_metadata?.display_name || 'Coder'
@@ -336,7 +338,7 @@ export function ProfileCard({ user, profile, isOwnProfile = true, badges = [], e
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-2">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 transition-all hover:bg-slate-800/60 group">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-500 group-hover:scale-110 transition-transform">
@@ -381,6 +383,19 @@ export function ProfileCard({ user, profile, isOwnProfile = true, badges = [], e
             <div className="text-2xl font-bold text-white">{profile?.followers_count || 0}</div>
           </div>
         </div>
+
+        {/* LeetCode Heatmap */}
+        {codingStats.find(s => s.platform === 'leetcode' && s.heatmap_data) && (
+          <div className="mt-6 border-t border-slate-800 pt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+              <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider">LeetCode Activity</h3>
+            </div>
+            <div className="bg-slate-950/50 rounded-lg p-4 border border-slate-800 overflow-hidden">
+              <LeetCodeHeatmap heatmapData={codingStats.find(s => s.platform === 'leetcode')?.heatmap_data} />
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

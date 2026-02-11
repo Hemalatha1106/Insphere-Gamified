@@ -10,7 +10,18 @@ import { Input } from '@/components/ui/input'
 import { Save, Upload, Settings, User } from 'lucide-react'
 import { toast } from 'sonner'
 import { Label } from '@/components/ui/label' // Added Label import
-import { Loader2, Github, Code, Globe, Terminal, Linkedin, X } from 'lucide-react' // Added missing imports
+import { Loader2, Github, Code, Globe, Terminal, Linkedin, X, Trash2, AlertTriangle } from 'lucide-react'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface Profile {
     id: string
@@ -373,6 +384,71 @@ export default function SettingsPage() {
                         </div>
                     </form>
                 )}
+            </div>
+
+            {/* Danger Zone */}
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+                <div className="bg-red-500/5 border border-red-500/20 rounded-lg p-6">
+                    <div className="flex items-start gap-4">
+                        <div className="p-3 bg-red-500/10 rounded-full">
+                            <AlertTriangle className="w-6 h-6 text-red-500" />
+                        </div>
+                        <div className="flex-1">
+                            <h2 className="text-xl font-bold text-white mb-2">Danger Zone</h2>
+                            <p className="text-slate-400 mb-6">
+                                Permanently delete your account and all associated data. This action cannot be undone.
+                            </p>
+
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="destructive" className="bg-red-500 hover:bg-red-600 text-white">
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        Delete Account
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent className="bg-slate-900 border-slate-800 text-white">
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                        <AlertDialogDescription className="text-slate-400">
+                                            This action cannot be undone. This will permanently delete your
+                                            account and remove your data from our servers.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel className="bg-slate-800 text-white border-slate-700 hover:bg-slate-700 hover:text-white">Cancel</AlertDialogCancel>
+                                        <AlertDialogAction
+                                            onClick={async () => {
+                                                try {
+                                                    setLoading(true) // Show global loading state or separate one
+                                                    const response = await fetch('/api/profile/delete', {
+                                                        method: 'DELETE',
+                                                    })
+
+                                                    if (response.ok) {
+                                                        toast.success('Account deleted successfully')
+                                                        // Sign out on client side to clear session
+                                                        await supabase.auth.signOut()
+                                                        router.push('/')
+                                                    } else {
+                                                        const data = await response.json()
+                                                        throw new Error(data.error || 'Failed to delete account')
+                                                    }
+                                                } catch (error: any) {
+                                                    console.error('Delete error:', error)
+                                                    toast.error(error.message || 'Failed to delete account')
+                                                    setLoading(false)
+                                                }
+                                            }}
+                                            className="bg-red-500 hover:bg-red-600 text-white border-none"
+                                        >
+                                            Delete Account
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     )

@@ -12,6 +12,7 @@ export default function PublicProfilePage() {
     const params = useParams()
     const userId = params.id as string
     const [profile, setProfile] = useState<any>(null)
+    const [codingStats, setCodingStats] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [currentUserId, setCurrentUserId] = useState<string | null>(null)
     const supabase = createClient()
@@ -32,6 +33,16 @@ export default function PublicProfilePage() {
 
                 if (error) throw error
                 setProfile(data)
+
+                // Fetch coding stats
+                const { data: statsData } = await supabase
+                    .from('coding_stats')
+                    .select('*')
+                    .eq('user_id', userId)
+
+                if (statsData) {
+                    setCodingStats(statsData)
+                }
 
             } catch (error) {
                 console.error('Error fetching publicly profile:', error)
@@ -75,6 +86,7 @@ export default function PublicProfilePage() {
                 <ProfileCard
                     profile={profile}
                     isOwnProfile={currentUserId === userId}
+                    codingStats={codingStats}
                 />
             </div>
         </div>

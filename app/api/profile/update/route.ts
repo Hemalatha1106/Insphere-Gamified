@@ -93,7 +93,30 @@ export async function POST(request: Request) {
         codeforces = extractUsername(codeforces, 'codeforces')
         geeksforgeeks = extractUsername(geeksforgeeks, 'geeksforgeeks')
 
-        // 1. Fetch Stats from external APIs
+        // 1. Check Rate Limit (Internal Throttling)
+        // Prevent users from spamming the update button
+        const { data: existingStats } = await supabase
+            .from('coding_stats')
+            .select('updated_at')
+            .eq('user_id', userId)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .single()
+
+        if (existingStats?.updated_at) {
+            const lastUpdate = new Date(existingStats.updated_at)
+            const now = new Date()
+            const diffMinutes = (now.getTime() - lastUpdate.getTime()) / (1000 * 60)
+
+            if (diffMinutes < 2) {
+                return NextResponse.json({
+                    message: `Profile is already up to date. Please wait ${Math.ceil(2 - diffMinutes)} minutes.`,
+                    throttled: true
+                }, { status: 429 })
+            }
+        }
+
+        // 2. Fetch Stats from external APIs
         const stats: any[] = []
 
         // --- LeetCode ---
@@ -111,11 +134,14 @@ export async function POST(request: Request) {
                 const fetchLeetCodeStats = async () => {
                     // Try Alfa API first (seems more reliable recently)
                     try {
-                        const [solvedRes, profileRes, contestRes] = await Promise.all([
+                        const [solvedRes, profileRes, contestRes, calendarRes] = await Promise.all([
                             fetch(`https://alfa-leetcode-api.onrender.com/${leetcode}/solved`),
                             fetch(`https://alfa-leetcode-api.onrender.com/${leetcode}`),
-                            fetch(`https://alfa-leetcode-api.onrender.com/${leetcode}/contest`)
+                            fetch(`https://alfa-leetcode-api.onrender.com/${leetcode}/contest`),
+                            fetch(`https://alfa-leetcode-api.onrender.com/${leetcode}/calendar`)
                         ])
+
+                        let submissionCalendar = {}
 
                         if (solvedRes.ok) {
                             const solvedData = await solvedRes.json()
@@ -138,8 +164,20 @@ export async function POST(request: Request) {
                             }
                         }
 
-                        // If we got valid data, return true
-                        if (totalSolved > 0) return true
+                        if (calendarRes.ok) {
+                            const calendarData = await calendarRes.json()
+                            if (calendarData.submissionCalendar) {
+                                // It usually comes as stringified JSON inside the JSON response
+                                try {
+                                    submissionCalendar = JSON.parse(calendarData.submissionCalendar)
+                                } catch (e) {
+                                    submissionCalendar = calendarData.submissionCalendar
+                                }
+                            }
+                        }
+
+                        // If we got valid data, return the calendar too
+                        if (totalSolved > 0) return { success: true, calendar: submissionCalendar }
                     } catch (e) {
                         console.warn('Alfa API failed, trying fallback...', e)
                     }
@@ -153,14 +191,7 @@ export async function POST(request: Request) {
                                 totalSolved = data.totalSolved
                                 totalQuestions = data.totalQuestions || 0
                                 ranking = data.ranking ? `Rank ${data.ranking}` : 'Active'
-                                // rating is not directly available usually, or might be inside? 
-                                // Inspecting JSON: "reputation": 0, ... no contest rating easily found in simple output? 
-                                // Actually debug output showed: "ranking": 164222, "contributionPoint": ..., "reputation": 0
-                                // It seems this API might not return contest rating directly in the root or same format.
-                                // Let's check keys from debug: ... "totalSolved", "easySolved", ... 
-                                // If contest rating is missing, we leave it as 0 or try to fetch it separately if possible?
-                                // For now, let's accept solved count is better than 0.
-                                return true
+                                return { success: true, calendar: data.submissionCalendar || {} }
                             }
                         }
                     } catch (e) {
@@ -176,25 +207,26 @@ export async function POST(request: Request) {
                                 totalQuestions = lcData.totalQuestions || 0
                                 totalSolved = lcData.totalSolved || 0
                                 ranking = lcData.ranking ? `Rank ${lcData.ranking}` : 'Active'
-                                return true
+                                return { success: true, calendar: lcData.submissionCalendar || {} }
                             }
                         }
                     } catch (e) {
                         console.warn('Heroku API failed', e)
                     }
 
-                    return false
+                    return { success: false, calendar: {} }
                 }
 
-                await fetchLeetCodeStats()
+                const result = await fetchLeetCodeStats()
 
                 stats.push({
                     user_id: userId,
                     platform: 'leetcode',
-                    total_problems: totalQuestions, // Alfa doesn't always give total *available*, but that's fine, we focus on solved
+                    total_problems: totalQuestions,
                     problems_solved: totalSolved,
                     contest_rating: contestRating,
-                    level: ranking
+                    level: ranking,
+                    heatmap_data: result.calendar
                 })
 
             } catch (e) {
@@ -259,6 +291,7 @@ export async function POST(request: Request) {
                 let rating = 0
                 let rank = 'Unrated'
 
+                console.log(`[Codeforces] Fetching info for ${codeforces}...`)
                 const cfInfoRes = await fetch(`https://codeforces.com/api/user.info?handles=${codeforces}`)
                 if (cfInfoRes.ok) {
                     const cfData = await cfInfoRes.json()
@@ -266,32 +299,47 @@ export async function POST(request: Request) {
                         const user = cfData.result[0]
                         rating = user.rating || 0
                         rank = user.rank || 'Unrated'
+                        console.log(`[Codeforces] Info success: Rating=${rating}, Rank=${rank}`)
+                    } else {
+                        console.warn(`[Codeforces] Info API returned non-OK: ${cfData.comment || 'No result'}`)
                     }
+                } else {
+                    console.error(`[Codeforces] Info API HTTP Error: ${cfInfoRes.status}`)
                 }
 
                 // 2. User Status for Solved Count
                 // We need to fetch submissions and count unique 'OK' verdicts
                 let solvedCount = 0
                 try {
-                    const cfStatusRes = await fetch(`https://codeforces.com/api/user.status?handle=${codeforces}&from=1&count=1000`)
+                    console.log(`[Codeforces] Fetching submissions for ${codeforces}...`)
+                    const cfStatusRes = await fetch(`https://codeforces.com/api/user.status?handle=${codeforces}&from=1&count=5000`)
+
                     if (cfStatusRes.ok) {
                         const statusData = await cfStatusRes.json()
                         if (statusData.status === 'OK') {
                             const submissions = statusData.result || []
+                            console.log(`[Codeforces] Fetched ${submissions.length} submissions`)
+
                             const solvedProblems = new Set()
 
                             submissions.forEach((sub: any) => {
                                 if (sub.verdict === 'OK' && sub.problem) {
-                                    // Create a unique key for the problem (contestId + index)
                                     const problemKey = `${sub.problem.contestId}-${sub.problem.index}`
                                     solvedProblems.add(problemKey)
                                 }
                             })
                             solvedCount = solvedProblems.size
+                            console.log(`[Codeforces] Unique solved count: ${solvedCount}`)
+                        } else {
+                            console.warn(`[Codeforces] Status API returned non-OK: ${statusData.comment}`)
                         }
+                    } else {
+                        console.error(`[Codeforces] Status API HTTP Error: ${cfStatusRes.status} ${cfStatusRes.statusText}`)
+                        const text = await cfStatusRes.text()
+                        console.error(`[Codeforces] Error Body: ${text}`)
                     }
                 } catch (e) {
-                    console.error('Codeforces status fetch error:', e)
+                    console.error('[Codeforces] Status fetch exception:', e)
                 }
 
                 stats.push({

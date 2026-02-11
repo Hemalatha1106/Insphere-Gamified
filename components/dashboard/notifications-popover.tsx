@@ -268,6 +268,20 @@ export function NotificationsPopover() {
                                                     <X className="w-3 h-3 mr-1.5" />
                                                     Reject
                                                 </Button>
+                                                {item.sender?.username && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-7 text-xs px-2 text-slate-400 hover:text-white"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            setOpen(false)
+                                                            router.push(`/u/${item.sender?.username}`)
+                                                        }}
+                                                    >
+                                                        View Profile
+                                                    </Button>
+                                                )}
                                             </div>
                                         )}
                                     </div>

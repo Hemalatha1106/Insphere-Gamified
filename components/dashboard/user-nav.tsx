@@ -25,9 +25,10 @@ interface UserNavProps {
             display_name?: string
         }
     }
+    profile?: any
 }
 
-export function UserNav({ user }: UserNavProps) {
+export function UserNav({ user, profile }: UserNavProps) {
     const router = useRouter()
     const supabase = createClient()
     const [open, setOpen] = useState(false)
@@ -37,16 +38,18 @@ export function UserNav({ user }: UserNavProps) {
         router.push('/auth/login')
     }
 
-    const username = user?.user_metadata?.username || user?.email?.split('@')[0] || 'User'
-    const initial = username.charAt(0).toUpperCase()
-    const avatarUrl = user?.user_metadata?.avatar_url
+    // Use profile data if available, otherwise fall back to user metadata
+    const username = profile?.username || user?.user_metadata?.username || user?.email?.split('@')[0] || 'User'
+    const displayName = profile?.display_name || user?.user_metadata?.display_name || username
+    const initial = displayName.charAt(0).toUpperCase()
+    const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url
 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-slate-800">
                     <Avatar className="h-10 w-10 border-2 border-slate-700">
-                        <AvatarImage src={avatarUrl} alt={username} />
+                        <AvatarImage src={avatarUrl} alt={username} className="object-cover" />
                         <AvatarFallback className="bg-slate-800 text-purple-400 font-bold">{initial}</AvatarFallback>
                     </Avatar>
                 </Button>
@@ -54,7 +57,7 @@ export function UserNav({ user }: UserNavProps) {
             <DropdownMenuContent className="w-56 bg-slate-900 border-slate-800 text-slate-200" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none text-white">{user?.user_metadata?.display_name || username}</p>
+                        <p className="text-sm font-medium leading-none text-white">{displayName}</p>
                         <p className="text-xs leading-none text-slate-400">
                             {user?.email}
                         </p>

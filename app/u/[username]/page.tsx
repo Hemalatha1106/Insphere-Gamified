@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { User, MapPin, Link as LinkIcon, Calendar, Github, Code, Terminal, Globe, Linkedin, Trophy, Share2, Download, Check } from 'lucide-react'
 import { toPng } from 'html-to-image'
 import { toast } from 'sonner'
+import { LeetCodeHeatmap } from '@/components/dashboard/leetcode-heatmap'
 
 interface Profile {
     id: string
@@ -31,6 +32,7 @@ interface CodingStats {
     problems_solved: number
     contest_rating: number
     level: string
+    heatmap_data?: any
 }
 
 export default function PublicProfilePage() {
@@ -268,6 +270,19 @@ export default function PublicProfilePage() {
                             </div>
                         )}
                     </div>
+
+                    {/* LeetCode Heatmap */}
+                    {codingStats.find(s => s.platform === 'leetcode' && s.heatmap_data) && (
+                        <div className="mb-10">
+                            <div className="flex items-center gap-2 mb-4">
+                                <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider print:text-gray-500">LeetCode Activity</h3>
+                            </div>
+                            <div className="bg-slate-950/50 rounded-lg p-4 border border-slate-800 overflow-hidden print:bg-transparent print:border-gray-200">
+                                <LeetCodeHeatmap heatmapData={codingStats.find(s => s.platform === 'leetcode')?.heatmap_data} />
+                            </div>
+                        </div>
+                    )}
 
                     {/* Footer Links (Live in HTML, visible in image) */}
                     <div className="flex flex-wrap justify-center gap-4">

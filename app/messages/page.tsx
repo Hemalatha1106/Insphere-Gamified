@@ -6,8 +6,14 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Send, Search, Plus, ArrowLeft, MessageCircle, Loader2, Image as ImageIcon, X } from 'lucide-react'
+import { Send, Search, Plus, ArrowLeft, MessageCircle, Loader2, Image as ImageIcon, X, MoreVertical, UserMinus, User } from 'lucide-react'
 import { toast } from 'sonner'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface Conversation {
   id: string
@@ -451,22 +457,70 @@ function MessagesContent() {
           {selectedConversation ? (
             <>
               {/* Chat Header */}
-              <div className="p-4 border-b border-slate-800 flex items-center gap-3 bg-slate-900/80">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="md:hidden text-slate-400 mr-2"
-                  onClick={() => setSelectedConversation(null)}
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </Button>
-                <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${selectedConversation.avatar_color} overflow-hidden`}>
-                  {selectedConversation.avatar_url && <img src={selectedConversation.avatar_url} alt="" className="w-full h-full object-cover" />}
+              <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="md:hidden text-slate-400 mr-2"
+                    onClick={() => setSelectedConversation(null)}
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </Button>
+                  <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${selectedConversation.avatar_color} overflow-hidden`}>
+                    {selectedConversation.avatar_url && <img src={selectedConversation.avatar_url} alt="" className="w-full h-full object-cover" />}
+                  </div>
+                  <div>
+                    <p className="font-medium text-white">{selectedConversation.display_name}</p>
+                    <p className="text-xs text-slate-400">@{selectedConversation.username}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium text-white">{selectedConversation.display_name}</p>
-                  <p className="text-xs text-slate-400">@{selectedConversation.username}</p>
-                </div>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white">
+                      <MoreVertical className="w-5 h-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="bg-slate-900 border-slate-800 text-slate-200">
+                    <DropdownMenuItem
+                      className="cursor-pointer hover:bg-slate-800 focus:bg-slate-800"
+                      onClick={() => router.push(`/u/${selectedConversation.username}`)}
+                    >
+                      <User className="w-4 h-4 mr-2" />
+                      View Profile
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="cursor-pointer text-red-400 hover:text-red-300 hover:bg-red-500/10 focus:bg-red-500/10 focus:text-red-300"
+                      onClick={async () => {
+                        if (!confirm(`Are you sure you want to unfriend ${selectedConversation.display_name}?`)) return
+
+                        try {
+                          // Delete the friend request (which means removing the friendship)
+                          // We need to match where (sender=me AND receiver=them) OR (sender=them AND receiver=me)
+                          const { error } = await supabase
+                            .from('friend_requests')
+                            .delete()
+                            .or(`and(sender_id.eq.${user.id},receiver_id.eq.${selectedConversation.id}),and(sender_id.eq.${selectedConversation.id},receiver_id.eq.${user.id})`)
+
+                          if (error) throw error
+
+                          toast.success(`Unfriended ${selectedConversation.display_name}`)
+
+                          // Remove from local list
+                          setConversations(prev => prev.filter(c => c.id !== selectedConversation.id))
+                          setSelectedConversation(null)
+                        } catch (err) {
+                          console.error('Error unfriending:', err)
+                          toast.error('Failed to unfriend user')
+                        }
+                      }}
+                    >
+                      <UserMinus className="w-4 h-4 mr-2" />
+                      Unfriend
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               {/* Messages */}

@@ -6,6 +6,7 @@ A gamified social platform for tracking competitive programming progress across 
 
 ### 👤 Public Profiles & Portfolio
 - **Unified Stats**: Aggregate your coding stats from LeetCode, GitHub, Codeforces, and GeeksforGeeks.
+- **LeetCode Heatmap**: Visualize your coding activity with a rolling 365-day heatmap, downloadable as part of your profile card.
 - **Shareable Card**: A dedicated public profile page (`/u/[username]`) to showcase your achievements.
 - **PDF Export**: Generate a professional, print-ready resume/CV from your profile with one click.
 - **Dynamic Avatar**: Upload custom avatars and banner images.
@@ -17,8 +18,15 @@ A gamified social platform for tracking competitive programming progress across 
 
 ### 💬 Social & Community
 - **Direct Messaging**: Real-time chat with friends, complete with unread indicators and toast notifications.
-- **Community Channels**: dedicated spaces for discussion and doubts.
-- **Friend System**: Follow/Unfollow and friend request system to build your network.
+- **Enhanced Chat**: View profiles and unfriend users directly from the chat interface.
+- **Community Channels**: Dedicated spaces for discussion and doubts.
+- **Friend System**: 
+    - Follow/Unfollow and friend request system.
+    - View profiles of request senders before accepting.
+
+### ⚙️ Account Management
+- **Delete Profile**: Secure "Danger Zone" to permanently delete your account and data.
+- **Rate Limiting**: Intelligent throttling to prevent API spamming (2-minute cooldown on updates).
 
 ## 🛠️ Tech Stack
 
