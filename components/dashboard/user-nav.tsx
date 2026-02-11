@@ -69,7 +69,7 @@ export function UserNav({ user, profile }: UserNavProps) {
                         <User className="mr-2 h-4 w-4" />
                         <span>Profile</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="focus:bg-slate-800 focus:text-white cursor-pointer" onClick={() => router.push('/dashboard')}>
+                    <DropdownMenuItem className="focus:bg-slate-800 focus:text-white cursor-pointer" onClick={() => router.push('/dashboard/stats')}>
                         <Award className="mr-2 h-4 w-4" />
                         <span>Badges & Stats</span>
                     </DropdownMenuItem>

@@ -18,6 +18,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 
 interface Badge {
   id: string
@@ -310,9 +317,48 @@ export function ProfileCard({ user, profile, isOwnProfile = true, badges = [], e
                 ))}
             </TooltipProvider>
             {earnedBadgeIds.length > 5 && (
-              <div className="flex items-center justify-center px-2 py-1 bg-slate-800 rounded-full border border-slate-700">
-                <span className="text-xs text-slate-400">+{earnedBadgeIds.length - 5} more</span>
-              </div>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <div className="flex items-center justify-center px-2 py-1 bg-slate-800 rounded-full border border-slate-700 cursor-pointer hover:bg-slate-700 transition-colors">
+                    <span className="text-xs text-slate-400">+{earnedBadgeIds.length - 5} more</span>
+                  </div>
+                </DialogTrigger>
+                <DialogContent className="bg-slate-900 border-slate-800 text-white sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Earned Badges ({earnedBadgeIds.length})</DialogTitle>
+                  </DialogHeader>
+                  <div className="flex flex-wrap gap-2 mt-4 max-h-[60vh] overflow-y-auto p-1">
+                    <TooltipProvider>
+                      {badges
+                        .filter(b => earnedBadgeIds.includes(b.id))
+                        .map(badge => (
+                          <Tooltip key={badge.id}>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-1.5 px-2 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded-full cursor-help hover:bg-yellow-500/20 transition-colors">
+                                <span className="text-sm">
+                                  {{
+                                    achievement: '🏆',
+                                    contest: '🎯',
+                                    community: '👥',
+                                    level: '⭐',
+                                    integration: '🔗',
+                                    consistency: '🔥',
+                                  }[badge.category] || '🎖️'}
+                                </span>
+                                <span className="text-xs font-medium text-yellow-500">{badge.name}</span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="font-bold">{badge.name}</p>
+                              <p className="text-xs text-slate-400">{badge.description}</p>
+                              <p className="text-xs text-yellow-500 mt-1">+{badge.points_value} pts</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        ))}
+                    </TooltipProvider>
+                  </div>
+                </DialogContent>
+              </Dialog>
             )}
           </div>
         )}
@@ -333,6 +379,12 @@ export function ProfileCard({ user, profile, isOwnProfile = true, badges = [], e
             <Link href={`https://leetcode.com/${profile.leetcode_username}`} target="_blank" className="px-3 py-1.5 bg-slate-800 rounded-full hover:bg-yellow-600/20 hover:text-yellow-500 transition-colors text-slate-400 text-xs font-bold flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
               LeetCode
+            </Link>
+          )}
+          {profile?.geeksforgeeks_username && (
+            <Link href={`https://www.geeksforgeeks.org/user/${profile?.geeksforgeeks_username}`} target="_blank" className="px-3 py-1.5 bg-slate-800 rounded-full hover:bg-green-600/20 hover:text-green-500 transition-colors text-slate-400 text-xs font-bold flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500"></span>
+              GFG
             </Link>
           )}
         </div>

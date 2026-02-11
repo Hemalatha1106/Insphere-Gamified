@@ -6,7 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2, Save, Github, Code, Globe, Terminal, Linkedin, User, Upload, X } from 'lucide-react'
+import { ImageCropper } from '@/components/ui/image-cropper'
+import { Loader2, Save, Github, Code, Globe, Terminal, Linkedin, User, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface EditProfileFormProps {
@@ -29,6 +30,12 @@ export function EditProfileForm({ onSuccess, onCancel }: EditProfileFormProps) {
         linkedin_username: '',
         banner_url: ''
     })
+
+    const [cropperOpen, setCropperOpen] = useState(false)
+    const [imageToCrop, setImageToCrop] = useState<string>('')
+    const [cropAspect, setCropAspect] = useState(1)
+    const [croppingField, setCroppingField] = useState<'avatar_url' | 'banner_url' | null>(null)
+    const [fileExtension, setFileExtension] = useState<string>('jpg')
 
     const router = useRouter()
     const supabase = createClient()
@@ -73,19 +80,36 @@ export function EditProfileForm({ onSuccess, onCancel }: EditProfileFormProps) {
         fetchProfile()
     }, [supabase])
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, bucket: 'avatars' | 'banners', field: 'avatar_url' | 'banner_url') => {
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, field: 'avatar_url' | 'banner_url') => {
         const file = e.target.files?.[0]
         if (!file) return
 
+        const reader = new FileReader()
+        reader.addEventListener('load', () => {
+            setImageToCrop(reader.result?.toString() || '')
+            setCroppingField(field)
+            setCropAspect(field === 'avatar_url' ? 1 : 4) // 1:1 for avatar, 4:1 for banner
+            setFileExtension(file.name.split('.').pop() || 'jpg')
+            setCropperOpen(true)
+        })
+        reader.readAsDataURL(file)
+        e.target.value = '' // Reset input so same file can be selected again
+    }
+
+    const handleCropComplete = async (croppedBlob: Blob) => {
+        if (!croppingField) return
+
         try {
             setSaving(true)
-            const fileExt = file.name.split('.').pop()
-            const fileName = `${Math.random()}.${fileExt}`
+            setCropperOpen(false) // Close cropper immediately
+
+            const fileName = `${Math.random()}.${fileExtension}`
             const filePath = `${fileName}`
+            const bucket = croppingField === 'avatar_url' ? 'avatars' : 'banners'
 
             const { error: uploadError } = await supabase.storage
                 .from(bucket)
-                .upload(filePath, file)
+                .upload(filePath, croppedBlob)
 
             if (uploadError) {
                 throw uploadError
@@ -95,13 +119,15 @@ export function EditProfileForm({ onSuccess, onCancel }: EditProfileFormProps) {
                 .from(bucket)
                 .getPublicUrl(filePath)
 
-            setFormData(prev => ({ ...prev, [field]: publicUrl }))
-            toast.success('Image uploaded successfully!')
+            setFormData(prev => ({ ...prev, [croppingField]: publicUrl }))
+            toast.success('Image cropped and uploaded successfully!')
         } catch (error: any) {
             console.error('Error uploading image:', error)
             toast.error('Error uploading image')
         } finally {
             setSaving(false)
+            setCroppingField(null)
+            setImageToCrop('')
         }
     }
 
@@ -223,7 +249,7 @@ export function EditProfileForm({ onSuccess, onCancel }: EditProfileFormProps) {
                                 id="avatar-upload"
                                 type="file"
                                 accept="image/*"
-                                onChange={(e) => handleFileUpload(e, 'avatars', 'avatar_url')}
+                                onChange={(e) => handleFileSelect(e, 'avatar_url')}
                                 className="bg-slate-800 border-slate-700 text-white file:text-purple-400 file:hover:text-purple-300"
                             />
                             {formData.avatar_url && (
@@ -249,7 +275,7 @@ export function EditProfileForm({ onSuccess, onCancel }: EditProfileFormProps) {
                             id="banner-upload"
                             type="file"
                             accept="image/*"
-                            onChange={(e) => handleFileUpload(e, 'banners', 'banner_url')}
+                            onChange={(e) => handleFileSelect(e, 'banner_url')}
                             className="bg-slate-800 border-slate-700 text-white file:text-purple-400 file:hover:text-purple-300"
                         />
                         {formData.banner_url && (
@@ -397,6 +423,18 @@ export function EditProfileForm({ onSuccess, onCancel }: EditProfileFormProps) {
                     )}
                 </Button>
             </div>
+
+            <ImageCropper
+                isOpen={cropperOpen}
+                imageSrc={imageToCrop}
+                aspect={cropAspect}
+                onCropComplete={handleCropComplete}
+                onCancel={() => {
+                    setCropperOpen(false)
+                    setImageToCrop('')
+                    setCroppingField(null)
+                }}
+            />
         </form>
     )
 }

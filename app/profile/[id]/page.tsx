@@ -13,6 +13,8 @@ export default function PublicProfilePage() {
     const userId = params.id as string
     const [profile, setProfile] = useState<any>(null)
     const [codingStats, setCodingStats] = useState<any[]>([])
+    const [badges, setBadges] = useState<any[]>([])
+    const [earnedBadgeIds, setEarnedBadgeIds] = useState<string[]>([])
     const [loading, setLoading] = useState(true)
     const [currentUserId, setCurrentUserId] = useState<string | null>(null)
     const supabase = createClient()
@@ -42,6 +44,20 @@ export default function PublicProfilePage() {
 
                 if (statsData) {
                     setCodingStats(statsData)
+                }
+
+                // Fetch all badges
+                const { data: badgesData } = await supabase.from('badges').select('*').order('points_value', { ascending: true })
+                if (badgesData) setBadges(badgesData)
+
+                // Fetch user earned badges
+                const { data: userBadgesData } = await supabase
+                    .from('user_badges')
+                    .select('badge_id')
+                    .eq('user_id', userId)
+
+                if (userBadgesData) {
+                    setEarnedBadgeIds(userBadgesData.map((ub: any) => ub.badge_id))
                 }
 
             } catch (error) {
@@ -87,6 +103,8 @@ export default function PublicProfilePage() {
                     profile={profile}
                     isOwnProfile={currentUserId === userId}
                     codingStats={codingStats}
+                    badges={badges}
+                    earnedBadgeIds={earnedBadgeIds}
                 />
             </div>
         </div>

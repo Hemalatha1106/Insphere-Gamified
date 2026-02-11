@@ -36,7 +36,11 @@ export default function LoginPage() {
         router.push('/dashboard')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to sign in')
+      let msg = err instanceof Error ? err.message : 'Failed to sign in'
+      if (msg.includes('Email not confirmed')) {
+        msg = 'Please confirm your email address before signing in. Check your inbox.'
+      }
+      setError(msg)
     } finally {
       setLoading(false)
     }

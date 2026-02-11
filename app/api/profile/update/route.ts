@@ -198,6 +198,25 @@ export async function POST(request: Request) {
                         console.warn('FaisalShohag API failed', e)
                     }
 
+                    // Fallback 2: LeetCode Stats API (Heroku) - Used by manual script, very reliable for totals
+                    try {
+                        const res = await fetch(`https://leetcode-stats-api.herokuapp.com/${leetcode}`)
+                        if (res.ok) {
+                            const data = await res.json()
+                            if (data.status === 'success') {
+                                // If we don't have totals yet, or if this one is more complete
+                                if (!totalSolved || totalSolved === 0) totalSolved = data.totalSolved
+                                if (!totalQuestions || totalQuestions === 0) totalQuestions = data.totalQuestions
+                                if (!ranking || ranking === 'Active') ranking = data.ranking ? `Rank ${data.ranking}` : 'Active'
+
+                                // Return success if we have what we need, even if calendar is missing (we might have got it from alfa)
+                                return { success: true, calendar: data.submissionCalendar || {} }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Heroku Stats API failed', e)
+                    }
+
                     // Fallback 2: Heroku API
                     try {
                         const lcRes = await fetch(`https://leetcode-stats-api.herokuapp.com/${leetcode}`)

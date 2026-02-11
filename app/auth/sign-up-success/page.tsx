@@ -14,10 +14,11 @@ export default function SignUpSuccessPage() {
                         <CheckCircle className="w-12 h-12 text-green-500" />
                     </div>
 
-                    <h1 className="text-2xl font-bold text-white mb-4">Account Created!</h1>
+                    <h1 className="text-2xl font-bold text-white mb-4">Check Your Email</h1>
 
                     <p className="text-slate-400 mb-8">
-                        Your account has been successfully created. You can now sign in to start your journey.
+                        Your account has been created successfully. <br />
+                        Please check your email to confirm your account before signing in.
                     </p>
 
                     <Link href="/auth/login" className="w-full">

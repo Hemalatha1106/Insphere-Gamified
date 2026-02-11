@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { User, Settings as SettingsIcon, MapPin, Link as LinkIcon, Calendar, Github, Code, Terminal, Globe, Linkedin, Trophy, Medal } from 'lucide-react'
+import { ProfileCard } from '@/components/dashboard/profile-card'
+import { User } from 'lucide-react'
 
 interface Profile {
   id: string
@@ -37,6 +38,8 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [codingStats, setCodingStats] = useState<CodingStats[]>([])
   const [loading, setLoading] = useState(true)
+  const [badges, setBadges] = useState<any[]>([])
+  const [earnedBadgeIds, setEarnedBadgeIds] = useState<string[]>([])
   const router = useRouter()
   const supabase = createClient()
 
@@ -70,6 +73,20 @@ export default function ProfilePage() {
         setCodingStats(statsData)
       }
 
+      // Fetch all badges
+      const { data: badgesData } = await supabase.from('badges').select('*').order('points_value', { ascending: true })
+      if (badgesData) setBadges(badgesData)
+
+      // Fetch user earned badges
+      const { data: userBadgesData } = await supabase
+        .from('user_badges')
+        .select('badge_id')
+        .eq('user_id', authUser.id)
+
+      if (userBadgesData) {
+        setEarnedBadgeIds(userBadgesData.map((ub: any) => ub.badge_id))
+      }
+
       setLoading(false)
     }
 
@@ -81,11 +98,34 @@ export default function ProfilePage() {
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-purple-500/20 border-t-purple-500 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-400">Redirecting to profile...</p>
+          <p className="text-slate-400">Loading profile...</p>
         </div>
       </div>
     )
   }
 
-  return null // Should redirect
+  if (!profile) return null
+
+  return (
+    <div className="min-h-screen bg-slate-950 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="mb-6">
+          <Link href="/dashboard" className="text-slate-400 hover:text-white flex items-center text-sm transition-colors">
+            <Button variant="ghost" size="sm" className="pl-0 hover:bg-transparent hover:text-white">
+              ← Back to Dashboard
+            </Button>
+          </Link>
+        </div>
+
+        <ProfileCard
+          user={user}
+          profile={profile}
+          isOwnProfile={true}
+          codingStats={codingStats}
+          badges={badges}
+          earnedBadgeIds={earnedBadgeIds}
+        />
+      </div>
+    </div>
+  )
 }
