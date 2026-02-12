@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ImageCropper } from '@/components/ui/image-cropper'
-import { Loader2, Save, Github, Code, Globe, Terminal, Linkedin, User, X } from 'lucide-react'
+import { Loader2, Save, Github, Code, Globe, Terminal, Linkedin, User, X, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface EditProfileFormProps {
@@ -36,6 +36,10 @@ export function EditProfileForm({ onSuccess, onCancel }: EditProfileFormProps) {
     const [cropAspect, setCropAspect] = useState(1)
     const [croppingField, setCroppingField] = useState<'avatar_url' | 'banner_url' | null>(null)
     const [fileExtension, setFileExtension] = useState<string>('jpg')
+
+    const [newPassword, setNewPassword] = useState('')
+    const [confirmPassword, setConfirmPassword] = useState('')
+    const [updatingPassword, setUpdatingPassword] = useState(false)
 
     const router = useRouter()
     const supabase = createClient()
@@ -219,6 +223,36 @@ export function EditProfileForm({ onSuccess, onCancel }: EditProfileFormProps) {
         }
     }
 
+    const handlePasswordUpdate = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newPassword) return
+
+        if (newPassword !== confirmPassword) {
+            toast.error("Passwords do not match")
+            return
+        }
+
+        if (newPassword.length < 6) {
+            toast.error("Password must be at least 6 characters")
+            return
+        }
+
+        setUpdatingPassword(true)
+        try {
+            const { error } = await supabase.auth.updateUser({ password: newPassword })
+            if (error) throw error
+
+            toast.success("Password updated successfully")
+            setNewPassword('')
+            setConfirmPassword('')
+        } catch (error: any) {
+            console.error('Error updating password:', error)
+            toast.error(error.message || 'Failed to update password')
+        } finally {
+            setUpdatingPassword(false)
+        }
+    }
+
     if (loading) {
         return (
             <div className="flex justify-center p-8">
@@ -399,6 +433,55 @@ export function EditProfileForm({ onSuccess, onCancel }: EditProfileFormProps) {
                         />
                     </div>
                 </div>
+            </div>
+
+            {/* Security Section */}
+            <div className="space-y-4 pt-6 border-t border-slate-800">
+                <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                    <Lock className="w-4 h-4" />
+                    Security (Change Password)
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="new-password" className="text-slate-200">New Password</Label>
+                        <Input
+                            id="new-password"
+                            type="password"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            className="bg-slate-800 border-slate-700 text-white"
+                            placeholder="••••••••"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="confirm-password" className="text-slate-200">Confirm Password</Label>
+                        <Input
+                            id="confirm-password"
+                            type="password"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            className="bg-slate-800 border-slate-700 text-white"
+                            placeholder="••••••••"
+                        />
+                    </div>
+                </div>
+                <Button
+                    type="button"
+                    onClick={handlePasswordUpdate}
+                    disabled={updatingPassword || !newPassword}
+                    variant="secondary"
+                    className="mt-2"
+                >
+                    {updatingPassword ? (
+                        <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Updating Password...
+                        </>
+                    ) : (
+                        'Update Password'
+                    )}
+                </Button>
             </div>
 
             <div className="flex justify-between pt-6 border-t border-slate-800">

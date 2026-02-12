@@ -3,9 +3,13 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Check, X, Shield, Users, Loader2 } from 'lucide-react'
+import { ArrowLeft, Check, X, Shield, Users, Loader2, Trash2, Plus, GripVertical } from 'lucide-react'
 import Link from 'next/link'
+import { toast } from 'sonner'
 
 interface Member {
     id: string
@@ -30,6 +34,10 @@ export default function CommunityAdminPage() {
     const [loading, setLoading] = useState(true)
     const [isAdmin, setIsAdmin] = useState(false)
     const [communityName, setCommunityName] = useState('')
+    const [communityDescription, setCommunityDescription] = useState('')
+    const [communityTags, setCommunityTags] = useState<string[]>([])
+    const [newTag, setNewTag] = useState('')
+    const [isSaving, setIsSaving] = useState(false)
 
     const fetchMembers = async () => {
         try {
@@ -102,11 +110,15 @@ export default function CommunityAdminPage() {
                 // Fetch community details
                 const { data: commData } = await supabase
                     .from('communities')
-                    .select('name')
+                    .select('name, description, tags')
                     .eq('id', communityId)
                     .single()
 
-                if (commData) setCommunityName(commData.name)
+                if (commData) {
+                    setCommunityName(commData.name)
+                    setCommunityDescription(commData.description || '')
+                    setCommunityTags(commData.tags || [])
+                }
 
                 await fetchMembers()
             } finally {
@@ -141,6 +153,41 @@ export default function CommunityAdminPage() {
         }
     }
 
+    const handleSaveDetails = async () => {
+        setIsSaving(true)
+        try {
+            const { error } = await supabase
+                .from('communities')
+                .update({
+                    description: communityDescription,
+                    tags: communityTags
+                })
+                .eq('id', communityId)
+
+            if (error) throw error
+
+            toast.success('Community details updated successfully')
+        } catch (error: any) {
+            console.error('Error updating details:', error)
+            toast.error('Failed to update details')
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
+    const handleAddTag = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && newTag.trim()) {
+            if (!communityTags.includes(newTag.trim())) {
+                setCommunityTags([...communityTags, newTag.trim()])
+            }
+            setNewTag('')
+        }
+    }
+
+    const handleRemoveTag = (tagToRemove: string) => {
+        setCommunityTags(communityTags.filter(tag => tag !== tagToRemove))
+    }
+
     if (loading) {
         return (
             <div className="min-h-screen bg-slate-950 flex items-center justify-center">
@@ -173,6 +220,52 @@ export default function CommunityAdminPage() {
                     <div className="bg-purple-900/30 px-4 py-2 rounded-lg border border-purple-500/30 flex items-center text-purple-300">
                         <Shield className="w-5 h-5 mr-2" />
                         Admin Access
+                    </div>
+                </div>
+
+                {/* Edit Details Section */}
+                <div className="bg-slate-900 border border-slate-800 rounded-lg p-6 mb-8">
+                    <h2 className="text-xl font-bold text-white mb-6">Edit Details</h2>
+                    <div className="space-y-6">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-300">Description (Bio)</label>
+                            <Textarea
+                                value={communityDescription}
+                                onChange={(e) => setCommunityDescription(e.target.value)}
+                                className="bg-slate-800 border-slate-700 text-white min-h-[100px]"
+                                placeholder="Describe your community..."
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-300">Tags (Press Enter to add)</label>
+                            <div className="flex flex-wrap gap-2 mb-2">
+                                {communityTags.map(tag => (
+                                    <Badge key={tag} variant="secondary" className="bg-purple-900/30 text-purple-300 hover:bg-purple-900/50">
+                                        {tag}
+                                        <button onClick={() => handleRemoveTag(tag)} className="ml-1 hover:text-white">
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </Badge>
+                                ))}
+                            </div>
+                            <Input
+                                value={newTag}
+                                onChange={(e) => setNewTag(e.target.value)}
+                                onKeyDown={handleAddTag}
+                                className="bg-slate-800 border-slate-700 text-white"
+                                placeholder="Add a tag..."
+                            />
+                        </div>
+
+                        <Button
+                            onClick={handleSaveDetails}
+                            disabled={isSaving}
+                            className="bg-purple-600 hover:bg-purple-700"
+                        >
+                            {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
+                            Save Changes
+                        </Button>
                     </div>
                 </div>
 
@@ -223,7 +316,7 @@ export default function CommunityAdminPage() {
                 )}
 
                 {/* Member List */}
-                <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
+                <div className="bg-slate-900 border border-slate-800 rounded-lg p-6 mb-8">
                     <h2 className="text-xl font-bold text-white mb-6 flex items-center">
                         <Users className="w-5 h-5 mr-2 text-slate-400" />
                         Members ({approvedMembers.length})
@@ -251,15 +344,62 @@ export default function CommunityAdminPage() {
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8 w-8 p-0"
-                                        onClick={() => handleUpdateStatus(member.id, 'rejected')}
+                                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8 px-2"
+                                        onClick={() => {
+                                            if (confirm(`Are you sure you want to remove ${member.profiles?.display_name || 'this member'}?`)) {
+                                                handleUpdateStatus(member.id, 'rejected')
+                                            }
+                                        }}
                                     >
-                                        <X className="w-4 h-4" />
+                                        <X className="w-4 h-4 mr-1" />
+                                        Remove
                                     </Button>
                                 )}
                             </div>
                         ))}
                     </div>
+                </div>
+
+                {/* Danger Zone */}
+                <div className="bg-red-950/20 border border-red-900/50 rounded-lg p-6">
+                    <h2 className="text-xl font-bold text-red-500 mb-4 flex items-center">
+                        <Trash2 className="w-5 h-5 mr-2" />
+                        Danger Zone
+                    </h2>
+                    <p className="text-slate-400 mb-6 text-sm">
+                        Deleting this community is irreversible. All channels, messages, and member associations will be permanently removed.
+                    </p>
+                    <Button
+                        variant="destructive"
+                        className="bg-red-600 hover:bg-red-700"
+                        onClick={async () => {
+                            const confirmed = confirm('Are you absolutely sure you want to delete this community? This action cannot be undone.')
+                            if (!confirmed) return
+
+                            // Double confirmation
+                            const communityNameInput = prompt(`Please type "${communityName}" to confirm deletion:`)
+                            if (communityNameInput !== communityName) {
+                                alert('Community name does not match.')
+                                return
+                            }
+
+                            try {
+                                const { error } = await supabase
+                                    .from('communities')
+                                    .delete()
+                                    .eq('id', communityId)
+
+                                if (error) throw error
+
+                                router.push('/community')
+                            } catch (error: any) {
+                                console.error('Error deleting community:', error)
+                                alert(`Failed to delete community: ${error.message}`)
+                            }
+                        }}
+                    >
+                        Delete Community
+                    </Button>
                 </div>
             </div>
         </div>

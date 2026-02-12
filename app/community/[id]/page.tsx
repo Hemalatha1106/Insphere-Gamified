@@ -1,13 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { ChannelList } from '@/components/community/channel-list'
 import { ChannelChat } from '@/components/community/channel-chat'
 import { CommunityLeaderboard } from '@/components/community/community-leaderboard'
-import { Loader2, Users, Lock, Unlock, Settings, ArrowLeft } from 'lucide-react'
+import { Loader2, Users, Lock, Unlock, Settings, ArrowLeft, Share2, Check } from 'lucide-react'
+import { toast } from 'sonner'
 import Link from 'next/link'
 
 interface Community {
@@ -18,6 +20,7 @@ interface Community {
     type: 'public' | 'private'
     created_by: string
     invite_code?: string
+    tags?: string[]
 }
 
 interface Member {
@@ -28,8 +31,12 @@ interface Member {
 export default function CommunityClassroomPage() {
     const params = useParams()
     const router = useRouter()
+    const searchParams = useSearchParams()
     const supabase = createClient()
     const communityId = params.id as string
+
+    // Check for invite code in URL
+    const urlInviteCode = searchParams.get('inviteCode')
 
     const [community, setCommunity] = useState<Community | null>(null)
     const [member, setMember] = useState<Member | null>(null)
@@ -40,6 +47,7 @@ export default function CommunityClassroomPage() {
     const [inviteCode, setInviteCode] = useState('')
     const [showInviteInput, setShowInviteInput] = useState(false)
     const [selectedChannel, setSelectedChannel] = useState<{ id: string, name: string } | null>(null)
+    const [copied, setCopied] = useState(false)
 
     useEffect(() => {
         const fetchData = async () => {
@@ -86,6 +94,14 @@ export default function CommunityClassroomPage() {
         if (communityId) fetchData()
     }, [communityId, router, supabase])
 
+    // Auto-fill invite code if present in URL
+    useEffect(() => {
+        if (urlInviteCode) {
+            setInviteCode(urlInviteCode)
+            setShowInviteInput(true)
+        }
+    }, [urlInviteCode])
+
     const handleJoin = async () => {
         if (!user || !community) return
 
@@ -129,6 +145,48 @@ export default function CommunityClassroomPage() {
         } finally {
             setJoining(false)
         }
+    }
+
+    const handleLeave = async () => {
+        if (!user || !community || !member) return
+
+        if (!confirm('Are you sure you want to leave this community?')) return
+
+        setJoining(true)
+        try {
+            const { error } = await supabase
+                .from('community_members')
+                .delete()
+                .eq('community_id', community.id)
+                .eq('user_id', user.id)
+
+            if (error) throw error
+
+            setMember(null)
+            router.refresh()
+        } catch (err: any) {
+            console.error('Error leaving:', err)
+            setError(err.message)
+        } finally {
+            setJoining(false)
+        }
+    }
+
+    const handleShare = () => {
+        if (!community) return
+
+        const origin = window.location.origin
+        let shareUrl = `${origin}/community/${community.id}`
+
+        if (community.type === 'private' && community.invite_code) {
+            shareUrl += `?inviteCode=${community.invite_code}`
+        }
+
+        navigator.clipboard.writeText(shareUrl)
+        setCopied(true)
+        toast.success('Invite link copied to clipboard!')
+
+        setTimeout(() => setCopied(false), 2000)
     }
 
     if (loading) {
@@ -178,11 +236,34 @@ export default function CommunityClassroomPage() {
                                 <span className="px-2 py-1 rounded-full text-xs border border-purple-500/30 text-purple-400 bg-purple-500/10">
                                     {community.category}
                                 </span>
+                                {community.tags && community.tags.map(tag => (
+                                    <Badge key={tag} variant="secondary" className="bg-slate-800 text-slate-400 border-slate-700 text-xs">
+                                        {tag}
+                                    </Badge>
+                                ))}
                             </div>
                             <p className="text-slate-400 max-w-2xl">{community.description}</p>
                         </div>
 
                         <div className="flex gap-3">
+                            {/* Share Button Logic: 
+                                - Private: Only Admins
+                                - Public: Admins OR Members 
+                            */}
+                            {((community.type === 'private' && isAdmin) ||
+                                (community.type === 'public' && (isAdmin || isMember))) && (
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="border-slate-700 text-slate-300 hover:text-white transition-all duration-200"
+                                        onClick={handleShare}
+                                        title="Share Invite Link"
+                                        disabled={copied}
+                                    >
+                                        {copied ? <Check className="w-4 h-4 text-green-500" /> : <Share2 className="w-4 h-4" />}
+                                    </Button>
+                                )}
+
                             {isAdmin && (
                                 <Link href={`/community/${community.id}/admin`}>
                                     <Button variant="outline" className="border-slate-700 text-slate-300">
@@ -190,6 +271,17 @@ export default function CommunityClassroomPage() {
                                         Manage
                                     </Button>
                                 </Link>
+                            )}
+
+                            {isMember && !isAdmin && (
+                                <Button
+                                    variant="outline"
+                                    className="border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                                    onClick={handleLeave}
+                                    disabled={joining}
+                                >
+                                    Leave
+                                </Button>
                             )}
 
                             {!isMember && !isPending && (

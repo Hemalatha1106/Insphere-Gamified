@@ -9,7 +9,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, Loader2, Lock, Unlock } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { ArrowLeft, Loader2, Lock, Unlock, X } from 'lucide-react'
 import Link from 'next/link'
 
 export default function CreateCommunityPage() {
@@ -24,7 +25,9 @@ export default function CreateCommunityPage() {
         category: '',
         type: 'public',
         invite_code: '',
+        tags: [] as string[]
     })
+    const [newTag, setNewTag] = useState('')
 
     const categories = ['DSA', 'Web', 'ML', 'Competitive Programming', 'System Design', 'Other']
 
@@ -49,6 +52,7 @@ export default function CreateCommunityPage() {
                         category: formData.category,
                         type: formData.type,
                         invite_code: formData.type === 'private' ? formData.invite_code : null,
+                        tags: formData.tags.length > 0 ? formData.tags : [formData.category],
                         created_by: user.id
                     }
                 ])
@@ -144,6 +148,39 @@ export default function CreateCommunityPage() {
                                     ))}
                                 </SelectContent>
                             </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label className="text-white">Tags (Optional)</Label>
+                            <div className="flex flex-wrap gap-2 mb-2">
+                                {formData.tags.map(tag => (
+                                    <Badge key={tag} variant="secondary" className="bg-purple-900/30 text-purple-300 hover:bg-purple-900/50">
+                                        {tag}
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, tags: formData.tags.filter(t => t !== tag) })}
+                                            className="ml-1 hover:text-white"
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </Badge>
+                                ))}
+                            </div>
+                            <Input
+                                value={newTag}
+                                onChange={(e) => setNewTag(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault()
+                                        if (newTag.trim() && !formData.tags.includes(newTag.trim())) {
+                                            setFormData({ ...formData, tags: [...formData.tags, newTag.trim()] })
+                                            setNewTag('')
+                                        }
+                                    }
+                                }}
+                                placeholder="Type a tag and press Enter..."
+                                className="bg-slate-800 border-slate-700 text-white"
+                            />
                         </div>
 
                         <div className="space-y-4 pt-4 border-t border-slate-800">

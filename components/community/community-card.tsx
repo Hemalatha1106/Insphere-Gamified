@@ -1,6 +1,7 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Users, Lock, Unlock, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 
@@ -11,6 +12,7 @@ interface Community {
     category: string
     type: 'public' | 'private'
     created_at: string
+    tags?: string[]
 }
 
 interface CommunityCardProps {
@@ -25,8 +27,8 @@ export function CommunityCard({ community, isMember }: CommunityCardProps) {
                 <div>
                     <div className="flex items-center gap-2 mb-2">
                         <span className={`text-xs px-2 py-1 rounded-full border ${community.type === 'public'
-                                ? 'border-green-500/30 text-green-400 bg-green-500/10'
-                                : 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10'
+                            ? 'border-green-500/30 text-green-400 bg-green-500/10'
+                            : 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10'
                             }`}>
                             {community.type === 'public' ? 'Public' : 'Private'}
                         </span>
@@ -45,9 +47,17 @@ export function CommunityCard({ community, isMember }: CommunityCardProps) {
                 )}
             </div>
 
-            <p className="text-slate-400 text-sm mb-6 line-clamp-2 min-h-[40px]">
+            <p className="text-slate-400 text-sm mb-4 line-clamp-2 min-h-[40px]">
                 {community.description || 'No description provided.'}
             </p>
+
+            <div className="flex flex-wrap gap-2 mb-6">
+                {community.tags && community.tags.length > 0 && community.tags.map(tag => (
+                    <Badge key={tag} variant="secondary" className="bg-slate-800 text-slate-400 border-slate-700 text-xs">
+                        {tag}
+                    </Badge>
+                ))}
+            </div>
 
             <div className="flex items-center justify-between mt-auto">
                 <div className="flex items-center text-slate-500 text-sm">

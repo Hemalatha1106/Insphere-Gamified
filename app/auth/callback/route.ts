@@ -30,15 +30,6 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}/auth/auth-code-error?error=No+code+provided`)
     }
 
-    // return the user to an error page with instructions e.g if code was missing but we handled it above
-    // keeping this as fallback? Actually code above covers it. 
-    // But structure of original file had the return at the end.
-    // The previous code block had logic that didn't return in the `else` of `if (code)`?
-    // No, wait. 
-    // Original: 
-    // if (code) { ... if (!error) return ... }
-    // return redirect error
-
-    // I will restructure slightly to be clear
+    // Fallback return if code block structure was weird (it shouldn't be reached due to if/else returns above)
     return NextResponse.redirect(`${origin}/auth/auth-code-error?error=Unknown+error`)
 }
