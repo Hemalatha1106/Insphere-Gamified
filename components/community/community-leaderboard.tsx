@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Trophy, Zap, Crown } from 'lucide-react'
+import { Trophy, Zap, Crown, Code, RefreshCcw } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 
@@ -13,6 +13,7 @@ interface LeaderboardMember {
     avatar_url: string | null
     username: string
     total_points: number
+    total_problems_solved: number
 }
 
 export function CommunityLeaderboard({ communityId }: { communityId: string }) {
@@ -46,14 +47,30 @@ export function CommunityLeaderboard({ communityId }: { communityId: string }) {
 
                 if (profileError) throw profileError
 
+                // 3. Fetch coding stats for these members
+                const { data: statsData, error: statsError } = await supabase
+                    .from('coding_stats')
+                    .select('user_id, problems_solved, platform')
+                    .in('user_id', userIds)
+                    .in('platform', ['leetcode', 'codeforces', 'geeksforgeeks'])
+
+                if (statsError) console.error('Error fetching coding stats:', statsError)
+
                 // Map to LeaderboardMember interface
-                const leaderboardData = profiles.map(p => ({
-                    user_id: p.id,
-                    display_name: p.display_name || 'User',
-                    avatar_url: p.avatar_url,
-                    username: p.username || 'user',
-                    total_points: p.total_points || 0
-                }))
+                const leaderboardData = profiles.map(p => {
+                    // Calculate total problems solved
+                    const userStats = statsData?.filter(s => s.user_id === p.id) || []
+                    const totalProblems = userStats.reduce((sum, stat) => sum + (stat.problems_solved || 0), 0)
+
+                    return {
+                        user_id: p.id,
+                        display_name: p.display_name || 'User',
+                        avatar_url: p.avatar_url,
+                        username: p.username || 'user',
+                        total_points: p.total_points || 0,
+                        total_problems_solved: totalProblems
+                    }
+                })
 
                 setMembers(leaderboardData)
 
@@ -126,9 +143,15 @@ export function CommunityLeaderboard({ communityId }: { communityId: string }) {
                                 <p className="text-xs text-slate-500 truncate">@{member.username}</p>
                             </div>
 
-                            <div className="flex items-center gap-1 text-xs font-medium text-slate-300 bg-slate-800/50 px-2 py-1 rounded">
-                                <Zap className="w-3 h-3 text-yellow-500" />
-                                {member.total_points}
+                            <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1 text-xs font-medium text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded" title="Total Problems Solved">
+                                    <Code className="w-3 h-3 text-blue-400" />
+                                    {member.total_problems_solved}
+                                </div>
+                                <div className="flex items-center gap-1 text-xs font-medium text-slate-300 bg-slate-800/50 px-2 py-1 rounded" title="Total Points">
+                                    <Zap className="w-3 h-3 text-yellow-500" />
+                                    {member.total_points}
+                                </div>
                             </div>
                         </Link>
                     ))

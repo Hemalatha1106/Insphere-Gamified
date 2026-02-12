@@ -111,6 +111,7 @@ export default function SignUpPage() {
       }
 
       if (data.user) {
+        console.log('SignUp Successful. Session:', data.session ? 'Created (Auto-confirm ON)' : 'Null (Confirm Required)')
         // Double check if identity exists (sometimes sign up returns user but no identity if email taken)
         if (data.user.identities && data.user.identities.length === 0) {
           throw new Error('User already exists with this email.')
@@ -118,7 +119,13 @@ export default function SignUpPage() {
 
         setSuccess(true)
         setTimeout(() => {
-          router.push('/auth/sign-up-success')
+          if (data.session) {
+            // Auto-confirm is ON, user is logged in
+            router.push('/dashboard')
+          } else {
+            // Confirm is OFF, user needs to check email
+            router.push('/auth/sign-up-success')
+          }
         }, 1500)
       }
     } catch (err) {

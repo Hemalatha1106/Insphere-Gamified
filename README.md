@@ -12,17 +12,18 @@ A gamified social platform for tracking competitive programming progress across 
 - **Dynamic Avatar**: Upload custom avatars and banner images.
 
 ### 🏆 Gamification
-- **Leaderboards**: Compete globally across all platforms.
+- **Leaderboards**: Compete globally or amongst friends with toggleable views.
 - **Badges**: Earn unique badges for milestones (e.g., "Century Club", "Streak Master").
 - **Levels & XP**: Gain XP for every problem solved and level up your profile.
 
 ### 💬 Social & Community
-- **Direct Messaging**: Real-time chat with friends, complete with unread indicators and toast notifications.
-- **Enhanced Chat**: View profiles and unfriend users directly from the chat interface.
-- **Community Channels**: Dedicated spaces for discussion and doubts.
+- **Direct Messaging**: Real-time chat with friends, featuring **Emoji support**, accurate local timestamps, unread indicators, and toast notifications.
 - **Friend System**: 
-    - Follow/Unfollow and friend request system.
-    - View profiles of request senders before accepting.
+    - **Real-time Search**: Find users instantly with debounced search.
+    - **Request Management**: Send, receive, accept, reject, and cancel friend requests.
+    - **Profile Viewing**: View full profiles of users before connecting.
+- **Notifications**: Real-time alerts for accepted friend requests and messages.
+- **Community Channels**: Dedicated spaces for discussion and doubts with a **resizable layout** (drag to adjust leaderboard/chat width).
 
 ### ⚙️ Account Management
 - **Delete Profile**: Secure "Danger Zone" to permanently delete your account and data.
@@ -77,7 +78,8 @@ The project uses Supabase (PostgreSQL). Key tables include:
 - `profiles`: User data and stats.
 - `coding_stats`: Platform-specific metrics.
 - `messages`: Direct messages between users.
-- `notifications`: Centralized command center (WIP).
+- `notifications`: Real-time alerts implementation.
+- `friend_requests`: Handling connection logic.
 - `badges` & `user_badges`: Gamification system.
 
 ## 🤝 Contributing

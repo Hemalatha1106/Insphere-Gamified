@@ -8,9 +8,10 @@ import { Badge } from '@/components/ui/badge'
 import { ChannelList } from '@/components/community/channel-list'
 import { ChannelChat } from '@/components/community/channel-chat'
 import { CommunityLeaderboard } from '@/components/community/community-leaderboard'
-import { Loader2, Users, Lock, Unlock, Settings, ArrowLeft, Share2, Check } from 'lucide-react'
+import { PanelLeft, Loader2, Users, Lock, Unlock, Settings, ArrowLeft, Share2, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import { cn } from '@/lib/utils'
 
 interface Community {
     id: string
@@ -48,6 +49,7 @@ export default function CommunityClassroomPage() {
     const [showInviteInput, setShowInviteInput] = useState(false)
     const [selectedChannel, setSelectedChannel] = useState<{ id: string, name: string } | null>(null)
     const [copied, setCopied] = useState(false)
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true)
 
     useEffect(() => {
         const fetchData = async () => {
@@ -93,6 +95,45 @@ export default function CommunityClassroomPage() {
 
         if (communityId) fetchData()
     }, [communityId, router, supabase])
+
+    const [leaderboardWidth, setLeaderboardWidth] = useState(320)
+    const [isResizing, setIsResizing] = useState(false)
+
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!isResizing) return
+
+            // Calculate new width: Total width - Mouse X position
+            // But we need to account for logic being from right edge
+            const containerRight = document.body.clientWidth
+            const newWidth = containerRight - e.clientX
+
+            // Limits
+            if (newWidth < 250) setLeaderboardWidth(250)
+            else if (newWidth > 600) setLeaderboardWidth(600)
+            else setLeaderboardWidth(newWidth)
+        }
+
+        const handleMouseUp = () => {
+            setIsResizing(false)
+            document.body.style.cursor = 'default'
+            document.body.style.userSelect = 'auto'
+        }
+
+        if (isResizing) {
+            document.addEventListener('mousemove', handleMouseMove)
+            document.addEventListener('mouseup', handleMouseUp)
+            document.body.style.cursor = 'col-resize'
+            document.body.style.userSelect = 'none'
+        }
+
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove)
+            document.removeEventListener('mouseup', handleMouseUp)
+            document.body.style.cursor = 'default'
+            document.body.style.userSelect = 'auto'
+        }
+    }, [isResizing])
 
     // Auto-fill invite code if present in URL
     useEffect(() => {
@@ -218,10 +259,25 @@ export default function CommunityClassroomPage() {
             {/* Header */}
             <div className="flex-none bg-slate-900/50 border-b border-slate-800 p-6">
                 <div className="max-w-7xl mx-auto">
-                    <Link href="/community" className="text-slate-400 hover:text-white flex items-center mb-4 text-sm">
-                        <ArrowLeft className="w-4 h-4 mr-1" />
-                        Back to Discover
-                    </Link>
+                    <div className="flex items-center justify-between mb-4">
+                        <Link href="/community" className="text-slate-400 hover:text-white flex items-center text-sm transition-colors">
+                            <ArrowLeft className="w-4 h-4 mr-1" />
+                            Back to Discover
+                        </Link>
+
+                        {isMember && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                                className={`text-slate-400 hover:text-white hidden md:flex ${!isSidebarOpen && 'text-purple-400 bg-purple-500/10'}`}
+                                title={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
+                            >
+                                <PanelLeft className="w-5 h-5 mr-2" />
+                                {isSidebarOpen ? 'Close Sidebar' : 'Open Sidebar'}
+                            </Button>
+                        )}
+                    </div>
 
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div>
@@ -319,9 +375,12 @@ export default function CommunityClassroomPage() {
             <div className="flex-1 overflow-hidden w-full">
                 <div className="max-w-7xl mx-auto h-full p-4 md:p-6">
                     {isMember ? (
-                        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4 h-full">
+                        <div className="flex h-full gap-4">
                             {/* 1. Left Sidebar: Channels */}
-                            <div className="hidden md:block col-span-1 h-full min-h-0">
+                            <div className={cn(
+                                "hidden md:block transition-all duration-300 ease-in-out h-full overflow-hidden",
+                                isSidebarOpen ? "w-64 opacity-100" : "w-0 opacity-0"
+                            )}>
                                 <ChannelList
                                     communityId={community.id}
                                     selectedChannelId={selectedChannel?.id || null}
@@ -331,7 +390,7 @@ export default function CommunityClassroomPage() {
                             </div>
 
                             {/* 2. Main Area: Chat */}
-                            <div className="col-span-1 md:col-span-3 lg:col-span-3 h-full min-h-0">
+                            <div className="flex-1 h-full min-w-0">
                                 {selectedChannel ? (
                                     <ChannelChat
                                         channelId={selectedChannel.id}
@@ -346,8 +405,18 @@ export default function CommunityClassroomPage() {
                             </div>
 
                             {/* 3. Right Sidebar: Leaderboard (Hidden on smaller screens, shown on large) */}
-                            <div className="hidden lg:block col-span-1 h-full overflow-y-auto min-h-0">
-                                <CommunityLeaderboard communityId={community.id} />
+                            <div className="hidden lg:flex shrink-0 h-full relative group/resize">
+                                {/* Resize Handle */}
+                                <div
+                                    className={`w-1 hover:w-2 hover:-ml-1 h-full cursor-col-resize flex items-center justify-center transition-all bg-transparent hover:bg-purple-500/50 absolute left-0 z-10 ${isResizing ? 'bg-purple-500 w-1' : ''}`}
+                                    onMouseDown={() => setIsResizing(true)}
+                                >
+                                    <div className="h-8 w-1 bg-slate-600 rounded-full" />
+                                </div>
+
+                                <div style={{ width: `${leaderboardWidth}px` }} className="h-full overflow-y-auto pl-2">
+                                    <CommunityLeaderboard communityId={community.id} />
+                                </div>
                             </div>
                         </div>
                     ) : (

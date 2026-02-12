@@ -68,38 +68,54 @@ export default function PublicProfilePage() {
                 const { data: profileData, error: profileError } = await supabase
                     .from('profiles')
                     .select('*')
-                    .eq('username', params.username)
-                    .single()
+                    .ilike('username', decodeURIComponent((params.username as string).trim()))
+                    .maybeSingle()
 
                 if (profileError) throw profileError
+                if (!profileData) {
+                    setError('User not found')
+                    return
+                }
                 setProfile(profileData)
 
-                // Fetch coding stats
-                const { data: statsData } = await supabase
+                // Fetch coding stats (can be empty)
+                const { data: statsData, error: statsError } = await supabase
                     .from('coding_stats')
                     .select('*')
                     .eq('user_id', profileData.id)
 
-                if (statsData) {
+                if (statsError) {
+                    console.error('Error fetching stats:', statsError)
+                } else if (statsData) {
                     setCodingStats(statsData)
                 }
 
                 // Fetch all badges
-                const { data: badgesData } = await supabase.from('badges').select('*').order('points_value', { ascending: true })
+                const { data: badgesData, error: badgesError } = await supabase.from('badges').select('*').order('points_value', { ascending: true })
+                if (badgesError) console.error('Error fetching badges:', badgesError)
                 if (badgesData) setBadges(badgesData)
 
                 // Fetch user earned badges
-                const { data: userBadgesData } = await supabase
+                const { data: userBadgesData, error: userBadgesError } = await supabase
                     .from('user_badges')
                     .select('badge_id')
                     .eq('user_id', profileData.id)
+
+                if (userBadgesError) console.error('Error fetching user badges:', userBadgesError)
 
                 if (userBadgesData) {
                     setEarnedBadgeIds(userBadgesData.map((ub: any) => ub.badge_id))
                 }
 
             } catch (err: any) {
-                console.error('Error fetching profile:', err)
+                console.error('Error fetching profile (RAW):', err)
+                console.error('Error fetching profile (JSON):', JSON.stringify(err, null, 2))
+                console.error('Error details:', {
+                    message: err?.message,
+                    code: err?.code,
+                    details: err?.details,
+                    hint: err?.hint
+                })
                 setError('User not found')
             } finally {
                 setLoading(false)

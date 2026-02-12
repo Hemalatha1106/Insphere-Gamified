@@ -6,14 +6,25 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Send, Search, Plus, ArrowLeft, MessageCircle, Loader2, Image as ImageIcon, X, MoreVertical, UserMinus, User } from 'lucide-react'
+import { Send, Search, Plus, ArrowLeft, MessageCircle, Loader2, Image as ImageIcon, X, MoreVertical, UserMinus, User, UserPlus, Users, Smile } from 'lucide-react'
 import { toast } from 'sonner'
+import { FriendSearch } from '@/components/messages/friend-search'
+import { FriendRequestsList } from '@/components/messages/friend-requests'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { Theme } from 'emoji-picker-react'
+import dynamic from 'next/dynamic'
+
+const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false })
 
 interface Conversation {
   id: string
@@ -36,6 +47,213 @@ interface Message {
   is_read: boolean
 }
 
+// Helper to format time consistently
+const formatMessageTime = (dateString: string) => {
+  try {
+    let date = new Date(dateString)
+    // If the string doesn't include timezone info (Z or +), treat it as UTC
+    if (dateString && !dateString.includes('Z') && !dateString.includes('+')) {
+      date = new Date(dateString + 'Z')
+    }
+
+    if (isNaN(date.getTime())) return ''
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })
+  } catch (e) {
+    return ''
+  }
+}
+
+// Resizable Sidebar Component
+function ResizableSidebar({
+  user,
+  conversations,
+  setConversations,
+  selectedConversation,
+  setSelectedConversation,
+  tab,
+  setTab,
+  searchQuery,
+  setSearchQuery,
+  pendingRequestsCount,
+  filteredConversations,
+  router
+}: any) {
+  const [width, setWidth] = useState(320)
+  const [isResizing, setIsResizing] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return
+      const newWidth = Math.max(280, Math.min(600, e.clientX - 20)) // 20px buffer/margin
+      setWidth(newWidth)
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+    }
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    } else {
+      document.body.style.cursor = 'default'
+      document.body.style.userSelect = 'auto'
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = 'default'
+      document.body.style.userSelect = 'auto'
+    }
+  }, [isResizing])
+
+  return (
+    <div
+      className={`relative bg-slate-900/50 border border-slate-800 rounded-lg flex flex-col overflow-hidden shrink-0 ${selectedConversation ? 'hidden md:flex' : 'flex'} w-full md:w-auto`}
+      style={!isMobile ? { width: `${width}px` } : {}}
+    >
+      {/* Header & Tabs */}
+      <div className="flex flex-col border-b border-slate-800 bg-slate-900/80">
+        <div className="p-4 pb-2">
+          <h2 className="text-xl font-bold text-white mb-4">Social</h2>
+          <div className="flex gap-2 mb-2 p-1 bg-slate-800/50 rounded-lg">
+            <button
+              onClick={() => setTab('messages')}
+              className={`flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md text-sm font-medium transition-all ${tab === 'messages' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-700/50'}`}
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span className="hidden sm:inline">Chats</span>
+            </button>
+            <button
+              onClick={() => setTab('requests')}
+              className={`flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md text-sm font-medium transition-all ${tab === 'requests' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-700/50'}`}
+            >
+              <Users className="w-4 h-4" />
+              <span className="hidden sm:inline">Requests</span>
+              {pendingRequestsCount > 0 && (
+                <span className="bg-red-500 text-white text-[10px] px-1.5 rounded-full ml-1">{pendingRequestsCount}</span>
+              )}
+            </button>
+            <button
+              onClick={() => setTab('find')}
+              className={`flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md text-sm font-medium transition-all ${tab === 'find' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-700/50'}`}
+            >
+              <UserPlus className="w-4 h-4" />
+              <span className="hidden sm:inline">Find</span>
+            </button>
+          </div>
+        </div>
+
+        {tab === 'messages' && (
+          <div className="px-4 pb-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Search chats..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Content Area */}
+      <div className="flex-1 overflow-y-auto bg-slate-900/30">
+        {tab === 'messages' && (
+          <div className="p-2 space-y-1">
+            {filteredConversations.length === 0 ? (
+              <div className="text-center py-12 px-4">
+                <div className="w-12 h-12 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <MessageCircle className="w-6 h-6 text-slate-600" />
+                </div>
+                <p className="text-slate-400 font-medium">No conversations</p>
+                <p className="text-slate-500 text-sm mt-1">Start by adding friends!</p>
+                <Button variant="link" onClick={() => setTab('find')} className="mt-2 text-purple-400">
+                  Find Friends
+                </Button>
+              </div>
+            ) : (
+              filteredConversations.map((conv: any) => (
+                <button
+                  key={conv.id}
+                  onClick={() => {
+                    setSelectedConversation(conv)
+                  }}
+                  className={`w-full p-3 rounded-xl text-left transition-all border border-transparent ${selectedConversation?.id === conv.id
+                    ? 'bg-purple-500/10 border-purple-500/20 shadow-[0_0_15px_rgba(168,85,247,0.1)]'
+                    : 'hover:bg-slate-800/50 hover:border-slate-700/50'
+                    }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${conv.avatar_color} relative p-[2px] shrink-0`}>
+                      <div className="w-full h-full rounded-full overflow-hidden bg-slate-900">
+                        {conv.avatar_url ? (
+                          <img src={conv.avatar_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-white font-bold bg-slate-800">
+                            {conv.display_name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      {/* Online indicator (mock) */}
+                      <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-slate-900 rounded-full"></div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start">
+                        <p className="text-sm font-semibold text-white truncate">{conv.display_name}</p>
+                        {conv.last_message_time && (
+                          <span className="text-[10px] text-slate-500">{conv.last_message_time}</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 truncate">@{conv.username}</p>
+                      <p className={`text-xs truncate mt-0.5 ${conv.unread_count > 0 ? 'text-white font-medium' : 'text-slate-500'}`}>
+                        {conv.last_message ? conv.last_message : 'Start chatting'}
+                      </p>
+                    </div>
+                    {conv.unread_count > 0 && (
+                      <span className="flex items-center justify-center min-w-[20px] h-5 px-1 bg-purple-500 rounded-full text-[10px] font-bold text-white shadow-lg shadow-purple-500/30">
+                        {conv.unread_count}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        )}
+
+        {tab === 'requests' && (
+          <FriendRequestsList currentUserId={user?.id} />
+        )}
+
+        {tab === 'find' && (
+          <FriendSearch currentUserId={user?.id} />
+        )}
+      </div>
+
+      {/* Drag Handle */}
+      <div
+        className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-purple-500/50 active:bg-purple-500 transition-colors z-50 md:block hidden"
+        onMouseDown={() => setIsResizing(true)}
+      />
+    </div>
+  )
+}
+
 function MessagesContent() {
   const [user, setUser] = useState<any>(null)
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -44,6 +262,8 @@ function MessagesContent() {
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [tab, setTab] = useState<'messages' | 'requests' | 'find'>('messages')
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0)
   const [sending, setSending] = useState(false)
 
   // Image Upload State
@@ -88,6 +308,15 @@ function MessagesContent() {
         `)
         .eq('status', 'accepted')
         .or(`sender_id.eq.${authUser.id},receiver_id.eq.${authUser.id}`)
+
+      // Fetch pending requests count
+      const { count: pendingCount } = await supabase
+        .from('friend_requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('receiver_id', authUser.id)
+        .eq('status', 'pending')
+
+      setPendingRequestsCount(pendingCount || 0)
 
       if (requests) {
         // Fetch unread counts
@@ -187,7 +416,10 @@ function MessagesContent() {
           // If message is from current conversation, append it
           // Use ref to check current selected, or rely on closure (selectedConversation is in dep array)
           if (selectedConversation && newMsg.sender_id === selectedConversation.id) {
-            setMessages(prev => [...prev, newMsg])
+            setMessages(prev => {
+              if (prev.some(m => m.id === newMsg.id)) return prev
+              return [...prev, newMsg]
+            })
 
             // Mark as read immediately since we are looking at it
             supabase
@@ -239,6 +471,17 @@ function MessagesContent() {
       supabase.removeChannel(channel)
     }
   }, [selectedConversation, user, supabase])
+
+  // Auto-focus input when conversation changes or sending completes
+  const inputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (!sending && selectedConversation) {
+      // Small timeout to ensure DOM is ready and prevent fighting with disabled state
+      setTimeout(() => {
+        inputRef.current?.focus()
+      }, 50)
+    }
+  }, [selectedConversation, sending])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -330,8 +573,15 @@ function MessagesContent() {
       if (error) throw error
 
       if (data) {
-        // Replace temp ID with real one
-        setMessages(prev => prev.map(m => m.id === tempId ? data : m))
+        // Replace temp ID with real one, but check if real one was already added by subscription
+        setMessages(prev => {
+          const exists = prev.some(m => m.id === data.id)
+          if (exists) {
+            // If real message exists, just remove the optimistic temp one
+            return prev.filter(m => m.id !== tempId)
+          }
+          return prev.map(m => m.id === tempId ? data : m)
+        })
       }
 
       removeSelectedImage()
@@ -400,57 +650,20 @@ function MessagesContent() {
       {/* Main Chat Interface */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 h-[calc(100vh-120px)] flex gap-4">
         {/* Conversations Sidebar */}
-        <div className={`w-full md:w-80 bg-slate-900/50 border border-slate-800 rounded-lg flex flex-col overflow-hidden ${selectedConversation ? 'hidden md:flex' : 'flex'}`}>
-          {/* Header */}
-          <div className="p-4 border-b border-slate-800">
-            <h2 className="text-xl font-bold text-white mb-3">Messages</h2>
-            <div className="relative mb-3">
-              <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
-              <input
-                type="text"
-                placeholder="Search friends..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
-              />
-            </div>
-          </div>
-
-          {/* Conversations List */}
-          <div className="flex-1 overflow-y-auto space-y-1 p-3">
-            {filteredConversations.length === 0 ? (
-              <div className="text-center py-8 text-slate-500 text-sm">
-                No friends found.<br />Add friends to start chatting!
-              </div>
-            ) : (
-              filteredConversations.map((conv) => (
-                <button
-                  key={conv.id}
-                  onClick={() => {
-                    setSelectedConversation(conv)
-                  }}
-                  className={`w-full p-3 rounded-lg text-left transition ${selectedConversation?.id === conv.id
-                    ? 'bg-purple-900/20 border border-purple-500/30'
-                    : 'hover:bg-slate-800'
-                    }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${conv.avatar_color} relative overflow-hidden`}>
-                      {conv.avatar_url && <img src={conv.avatar_url} alt="" className="w-full h-full object-cover" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{conv.display_name}</p>
-                      <p className="text-xs text-slate-400 truncate">@{conv.username}</p>
-                    </div>
-                    {conv.unread_count > 0 && (
-                      <span className="flex-shrink-0 bg-purple-500 rounded-full w-2.5 h-2.5 shadow-[0_0_10px_rgba(168,85,247,0.5)]" />
-                    )}
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
+        <ResizableSidebar
+          user={user}
+          conversations={conversations}
+          setConversations={setConversations}
+          selectedConversation={selectedConversation}
+          setSelectedConversation={setSelectedConversation}
+          tab={tab}
+          setTab={setTab}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          pendingRequestsCount={pendingRequestsCount}
+          filteredConversations={filteredConversations}
+          router={router}
+        />
 
         {/* Chat Area */}
         <div className={`flex-1 flex-col bg-slate-900/50 border border-slate-800 rounded-lg overflow-hidden ${selectedConversation ? 'flex' : 'hidden md:flex'}`}>
@@ -555,7 +768,7 @@ function MessagesContent() {
                         )}
                         {msg.content && <p className="text-sm whitespace-pre-wrap">{msg.content}</p>}
                         <p className={`text-[10px] mt-1 text-right ${msg.sender_id === user?.id ? 'text-purple-200' : 'text-slate-500'}`}>
-                          {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {formatMessageTime(msg.created_at)}
                         </p>
                       </div>
                     </div>
@@ -602,7 +815,26 @@ function MessagesContent() {
                   >
                     <ImageIcon className="w-5 h-5" />
                   </Button>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="text-slate-400 hover:text-white shrink-0"
+                      >
+                        <Smile className="w-5 h-5" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full border-none p-0 bg-transparent shadow-none" align="start">
+                      <EmojiPicker
+                        theme={Theme.DARK}
+                        onEmojiClick={(emojiData) => setNewMessage(prev => prev + emojiData.emoji)}
+                      />
+                    </PopoverContent>
+                  </Popover>
                   <Input
+                    ref={inputRef}
                     type="text"
                     placeholder="Type a message..."
                     value={newMessage}

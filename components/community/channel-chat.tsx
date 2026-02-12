@@ -4,8 +4,17 @@ import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Send, Image as ImageIcon, X, Loader2, Hash } from 'lucide-react'
+import { Send, Image as ImageIcon, X, Loader2, Hash, Smile } from 'lucide-react'
 import { toast } from 'sonner'
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover"
+import { Theme } from 'emoji-picker-react'
+import dynamic from 'next/dynamic'
+
+const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false })
 
 interface Message {
     id: string
@@ -18,6 +27,24 @@ interface Message {
         username: string
         display_name: string
         avatar_url: string
+    }
+}
+
+
+
+// Helper to format time consistently
+const formatMessageTime = (dateString: string) => {
+    try {
+        let date = new Date(dateString)
+        // If the string doesn't include timezone info (Z or +), treat it as UTC
+        if (dateString && !dateString.includes('Z') && !dateString.includes('+')) {
+            date = new Date(dateString + 'Z')
+        }
+
+        if (isNaN(date.getTime())) return ''
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })
+    } catch (e) {
+        return ''
     }
 }
 
@@ -144,6 +171,16 @@ export function ChannelChat({ channelId, channelName, currentUserId }: ChannelCh
         }
     }
 
+    // Auto-focus input when channel changes or sending completes
+    const inputRef = useRef<HTMLInputElement>(null)
+    useEffect(() => {
+        if (!sending) {
+            setTimeout(() => {
+                inputRef.current?.focus()
+            }, 50)
+        }
+    }, [channelId, sending])
+
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault()
         if ((!newMessage.trim() && !selectedImage) || sending) return
@@ -193,7 +230,11 @@ export function ChannelChat({ channelId, channelName, currentUserId }: ChannelCh
             if (error) throw error
 
             if (data) {
-                setMessages(prev => [...prev, data as any])
+                setMessages(prev => {
+                    // Check if already added by realtime subscription
+                    if (prev.some(m => m.id === data.id)) return prev
+                    return [...prev, data as any]
+                })
             }
 
             setNewMessage('')
@@ -257,7 +298,7 @@ export function ChannelChat({ channelId, channelName, currentUserId }: ChannelCh
                                                 {msg.profiles?.display_name || msg.profiles?.username || 'User'}
                                             </span>
                                             <span className="text-[10px] text-slate-500">
-                                                {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                {formatMessageTime(msg.created_at)}
                                             </span>
                                         </div>
                                     )}
@@ -313,6 +354,24 @@ export function ChannelChat({ channelId, channelName, currentUserId }: ChannelCh
                     >
                         <ImageIcon className="w-5 h-5" />
                     </Button>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="text-slate-400 hover:text-white shrink-0 h-8 w-8 rounded-full hover:bg-slate-700"
+                            >
+                                <Smile className="w-5 h-5" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full border-none p-0 bg-transparent shadow-none" align="start">
+                            <EmojiPicker
+                                theme={Theme.DARK}
+                                onEmojiClick={(emojiData) => setNewMessage(prev => prev + emojiData.emoji)}
+                            />
+                        </PopoverContent>
+                    </Popover>
                     <input
                         type="file"
                         ref={fileInputRef}
@@ -322,6 +381,7 @@ export function ChannelChat({ channelId, channelName, currentUserId }: ChannelCh
                     />
 
                     <input
+                        ref={inputRef}
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
                         onKeyDown={(e) => {

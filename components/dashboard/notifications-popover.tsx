@@ -15,7 +15,7 @@ import { formatDistanceToNow } from 'date-fns'
 
 interface NotificationItem {
     id: string
-    type: 'message' | 'channel_message' | 'friend_request' | 'system'
+    type: 'message' | 'channel_message' | 'friend_request' | 'system' | 'friend_request_accepted'
     title: string
     content: string
     link?: string
@@ -218,6 +218,13 @@ export function NotificationsPopover() {
                                                 <AvatarImage src={item.metadata.avatar_url} />
                                                 <AvatarFallback className="bg-slate-800 text-purple-400">
                                                     <MessageCircle className="w-4 h-4" />
+                                                </AvatarFallback>
+                                            </Avatar>
+                                        ) : item.type === 'friend_request_accepted' && item.metadata?.avatar_url ? (
+                                            <Avatar className="h-9 w-9 border border-slate-700">
+                                                <AvatarImage src={item.metadata.avatar_url} />
+                                                <AvatarFallback className="bg-slate-800 text-green-400">
+                                                    <UserPlus className="w-4 h-4" />
                                                 </AvatarFallback>
                                             </Avatar>
                                         ) : item.type === 'channel_message' ? (

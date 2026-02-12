@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Trophy, TrendingUp, Award, Users } from 'lucide-react'
+import { Trophy, TrendingUp, Award, Users, Code } from 'lucide-react'
 
 interface LeaderboardEntry {
   id: string
@@ -14,6 +14,7 @@ interface LeaderboardEntry {
   total_points: number
   level: number
   avatar_url?: string
+  total_problems_solved: number
 }
 
 export default function LeaderboardPage() {
@@ -47,7 +48,26 @@ export default function LeaderboardPage() {
         .limit(50)
 
       if (!leaderboardError && leaderboardData) {
-        setLeaderboard(leaderboardData)
+        // Fetch coding stats for these users
+        const userIds = leaderboardData.map(p => p.id)
+        const { data: statsData } = await supabase
+          .from('coding_stats')
+          .select('user_id, problems_solved')
+          .in('user_id', userIds)
+          .in('platform', ['leetcode', 'codeforces', 'geeksforgeeks'])
+
+        // Map data with calculated problems
+        const leaderboardWithStats = leaderboardData.map(p => {
+          const userStats = statsData?.filter(s => s.user_id === p.id) || []
+          const totalProblems = userStats.reduce((sum, stat) => sum + (stat.problems_solved || 0), 0)
+
+          return {
+            ...p,
+            total_problems_solved: totalProblems
+          }
+        })
+
+        setLeaderboard(leaderboardWithStats)
       }
 
       // Get user's current points
@@ -138,7 +158,7 @@ export default function LeaderboardPage() {
         {/* Leaderboard Table */}
         <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-lg overflow-hidden shadow-lg">
           {/* Table Header */}
-          <div className="grid grid-cols-10 gap-4 bg-slate-700/50 p-4 border-b border-slate-700 font-medium text-slate-300">
+          <div className="grid grid-cols-12 gap-4 bg-slate-700/50 p-4 border-b border-slate-700 font-medium text-slate-300">
             <div className="col-span-1 text-center">#</div>
             <div className="col-span-5 flex items-center gap-2">
               <Users className="w-4 h-4" />
@@ -147,6 +167,10 @@ export default function LeaderboardPage() {
             <div className="col-span-2 flex items-center gap-2 justify-center">
               <TrendingUp className="w-4 h-4" />
               Points
+            </div>
+            <div className="col-span-2 flex items-center gap-2 justify-center">
+              <Code className="w-4 h-4" />
+              Solved
             </div>
             <div className="col-span-2 flex items-center gap-2 justify-center">
               <Award className="w-4 h-4" />
@@ -161,17 +185,17 @@ export default function LeaderboardPage() {
               return (
                 <div
                   key={entry.id}
-                  className="grid grid-cols-10 gap-4 p-4 border-b border-slate-700 hover:bg-slate-700/30 transition group cursor-pointer"
+                  className="grid grid-cols-12 gap-4 p-4 border-b border-slate-700 hover:bg-slate-700/30 transition group cursor-pointer"
                 >
                   {/* Rank */}
                   <div className="col-span-1 flex items-center justify-center">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${rank === 1
-                        ? 'bg-gradient-to-br from-yellow-500 to-orange-500'
-                        : rank === 2
-                          ? 'bg-gradient-to-br from-gray-400 to-gray-500'
-                          : rank === 3
-                            ? 'bg-gradient-to-br from-orange-600 to-amber-700'
-                            : 'bg-slate-600'
+                      ? 'bg-gradient-to-br from-yellow-500 to-orange-500'
+                      : rank === 2
+                        ? 'bg-gradient-to-br from-gray-400 to-gray-500'
+                        : rank === 3
+                          ? 'bg-gradient-to-br from-orange-600 to-amber-700'
+                          : 'bg-slate-600'
                       }`}>
                       {rank}
                     </div>
@@ -197,6 +221,11 @@ export default function LeaderboardPage() {
                   {/* Points */}
                   <div className="col-span-2 flex items-center justify-center">
                     <span className="text-lg font-bold text-purple-400">{entry.total_points.toLocaleString()}</span>
+                  </div>
+
+                  {/* Solved Problems */}
+                  <div className="col-span-2 flex items-center justify-center">
+                    <span className="text-lg font-bold text-blue-400">{entry.total_problems_solved.toLocaleString()}</span>
                   </div>
 
                   {/* Level */}
