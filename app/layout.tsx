@@ -11,6 +11,7 @@ export const metadata: Metadata = {
   title: 'Insphere - Competitive Programming Platform',
   description: 'Gamified platform for tracking LeetCode, GeeksforGeeks, Codeforces, and GitHub profiles with community features',
   keywords: ['competitive programming', 'leetcode', 'codeforces', 'gamification', 'community'],
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://insphere-gamified.vercel.app'),
 }
 
 export const viewport: Viewport = {

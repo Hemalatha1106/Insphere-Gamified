@@ -175,7 +175,7 @@ export default function CommunityClassroomPage() {
     const handleShare = () => {
         if (!community) return
 
-        const origin = window.location.origin
+        const origin = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
         let shareUrl = `${origin}/community/${community.id}`
 
         if (community.type === 'private' && community.invite_code) {
