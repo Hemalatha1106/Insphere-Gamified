@@ -46,7 +46,7 @@ We have a dedicated guide for deploying this project to Vercel.
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/insphere-gamified.git
+   git clone https://github.com/Hemalatha1106/insphere-gamified.git
    cd insphere-gamified
    ```
 
