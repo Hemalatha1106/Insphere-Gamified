@@ -2,14 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { CodingStatsCard } from '@/components/dashboard/coding-stats'
 import { BadgesShowcase } from '@/components/dashboard/badges-showcase'
-import { UserNav } from '@/components/dashboard/user-nav'
-import { NotificationsPopover } from '@/components/dashboard/notifications-popover'
-import { Users, MessageSquare, TrendingUp, Award, ArrowLeft } from 'lucide-react'
+import { TrendingUp, Award, ArrowLeft } from 'lucide-react'
 
 interface Profile {
     id: string
@@ -43,7 +40,6 @@ export default function StatsPage() {
     const [codingStats, setCodingStats] = useState<CodingStats[]>([])
     const [badges, setBadges] = useState<any[]>([])
     const [earnedBadgeIds, setEarnedBadgeIds] = useState<string[]>([])
-    const [unreadMessageCount, setUnreadMessageCount] = useState(0)
     const [loading, setLoading] = useState(true)
     const router = useRouter()
     const supabase = createClient()
@@ -62,17 +58,6 @@ export default function StatsPage() {
                 }
 
                 setUser(authUser)
-
-                // Fetch unread messages count (for nav)
-                const { count, error: countError } = await supabase
-                    .from('messages')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('recipient_id', authUser.id)
-                    .eq('is_read', false)
-
-                if (!countError && count !== null) {
-                    setUnreadMessageCount(count)
-                }
 
                 // Fetch profile
                 const { data: profileData } = await supabase.from('profiles').select('*').eq('id', authUser.id).single()
@@ -131,47 +116,11 @@ export default function StatsPage() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-            {/* Navigation */}
-            <nav className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/80 backdrop-blur">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-                    <Link href="/dashboard" className="text-2xl font-bold bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 bg-clip-text text-transparent">
-                        INSPHERE
-                    </Link>
-
-                    <div className="flex items-center gap-3">
-                        <Link href="/community">
-                            <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white">
-                                <Users className="w-4 h-4 mr-2" />
-                                Community
-                            </Button>
-                        </Link>
-                        <Link href="/messages">
-                            <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white relative">
-                                <MessageSquare className="w-4 h-4 mr-2" />
-                                Messages
-                                {unreadMessageCount > 0 && (
-                                    <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500 ring-2 ring-slate-950 animate-pulse" />
-                                )}
-                            </Button>
-                        </Link>
-
-                        <NotificationsPopover />
-
-                        {user && <UserNav user={user} profile={profile} />}
-                    </div>
-                </div>
-            </nav>
 
             {/* Main Content */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
                 <div className="mb-8 flex items-center gap-4">
-                    <Link href="/dashboard">
-                        <Button variant="ghost" className="text-slate-400 hover:text-white">
-                            <ArrowLeft className="w-4 h-4 mr-2" />
-                            Back to Dashboard
-                        </Button>
-                    </Link>
                     <h1 className="text-3xl font-bold text-white flex items-center gap-2">
                         <Award className="w-8 h-8 text-yellow-500" />
                         Badges & Stats

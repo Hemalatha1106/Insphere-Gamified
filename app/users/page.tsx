@@ -129,26 +129,7 @@ export default function UsersPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/80 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <Link href="/dashboard" className="text-2xl font-bold bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 bg-clip-text text-transparent">
-            INSPHERE
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard">
-              <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white">
-                Dashboard
-              </Button>
-            </Link>
-            <Link href="/community">
-              <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white">
-                Community
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </nav>
+
 
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -179,11 +160,10 @@ export default function UsersPage() {
               <button
                 key={sort}
                 onClick={() => setSortBy(sort)}
-                className={`px-4 py-2 rounded-lg font-medium transition ${
-                  sortBy === sort
+                className={`px-4 py-2 rounded-lg font-medium transition ${sortBy === sort
                     ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
                     : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                }`}
+                  }`}
               >
                 Sort by {sort.charAt(0).toUpperCase() + sort.slice(1)}
               </button>
@@ -230,11 +210,10 @@ export default function UsersPage() {
                   {/* Follow Button */}
                   <Button
                     onClick={() => toggleFollow(u.id)}
-                    className={`w-full ${
-                      isFollowing
+                    className={`w-full ${isFollowing
                         ? 'bg-slate-700 hover:bg-slate-600 text-white'
                         : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white'
-                    }`}
+                      }`}
                   >
                     <UserPlus className="w-4 h-4 mr-2" />
                     {isFollowing ? 'Following' : 'Follow'}

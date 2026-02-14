@@ -13,16 +13,22 @@ interface Community {
     type: 'public' | 'private'
     created_at: string
     tags?: string[]
+    created_by: string
 }
+
 
 interface CommunityCardProps {
     community: Community
     isMember: boolean
+    onSelect: (community: Community) => void
 }
 
-export function CommunityCard({ community, isMember }: CommunityCardProps) {
+export function CommunityCard({ community, isMember, onSelect }: CommunityCardProps) {
     return (
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-6 hover:border-purple-500/50 transition-all group">
+        <div
+            onClick={() => onSelect(community)}
+            className="bg-slate-900 border border-slate-800 rounded-lg p-6 hover:border-purple-500/50 transition-all group cursor-pointer relative"
+        >
             <div className="flex justify-between items-start mb-4">
                 <div>
                     <div className="flex items-center gap-2 mb-2">
@@ -62,10 +68,10 @@ export function CommunityCard({ community, isMember }: CommunityCardProps) {
             <div className="flex items-center justify-between mt-auto">
                 <div className="flex items-center text-slate-500 text-sm">
                     <Users className="w-4 h-4 mr-1" />
-                    <span>View Members</span>
+                    <span>View Details</span>
                 </div>
 
-                <Link href={`/community/${community.id}`}>
+                <Link href={`/community/${community.id}`} onClick={(e) => e.stopPropagation()}>
                     <Button
                         variant={isMember ? "secondary" : "default"}
                         className={isMember ? "" : "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"}

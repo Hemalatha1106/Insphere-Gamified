@@ -76,7 +76,8 @@ function ResizableSidebar({
   setSearchQuery,
   pendingRequestsCount,
   filteredConversations,
-  router
+  router,
+  supabase,
 }: any) {
   const [width, setWidth] = useState(320)
   const [isResizing, setIsResizing] = useState(false)
@@ -126,7 +127,31 @@ function ResizableSidebar({
       {/* Header & Tabs */}
       <div className="flex flex-col border-b border-slate-800 bg-slate-900/80">
         <div className="p-4 pb-2">
-          <h2 className="text-xl font-bold text-white mb-4">Social</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-white">Social</h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-slate-400 hover:text-white h-7 px-2"
+              onClick={async () => {
+                const { error } = await supabase
+                  .from('messages')
+                  .update({ is_read: true })
+                  .eq('recipient_id', user?.id)
+                  .eq('is_read', false)
+
+                if (error) {
+                  toast.error("Failed to mark all as read")
+                } else {
+                  toast.success("All messages marked as read")
+                  // Update local state for conversations
+                  setConversations((prev: any[]) => prev.map((c: any) => ({ ...c, unread_count: 0 })))
+                }
+              }}
+            >
+              Mark all read
+            </Button>
+          </div>
           <div className="flex gap-2 mb-2 p-1 bg-slate-800/50 rounded-lg">
             <button
               onClick={() => setTab('messages')}
@@ -215,9 +240,6 @@ function ResizableSidebar({
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start">
                         <p className="text-sm font-semibold text-white truncate">{conv.display_name}</p>
-                        {conv.last_message_time && (
-                          <span className="text-[10px] text-slate-500">{conv.last_message_time}</span>
-                        )}
                       </div>
                       <p className="text-xs text-slate-400 truncate">@{conv.username}</p>
                       <p className={`text-xs truncate mt-0.5 ${conv.unread_count > 0 ? 'text-white font-medium' : 'text-slate-500'}`}>
@@ -275,10 +297,13 @@ function MessagesContent() {
   const searchParams = useSearchParams()
   const targetUserId = searchParams.get('userId')
   const supabase = createClient()
-  const messagesEndRef = React.useRef<HTMLDivElement>(null)
+  const messageContainerRef = React.useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    if (messageContainerRef.current) {
+      const { scrollHeight, clientHeight } = messageContainerRef.current
+      messageContainerRef.current.scrollTop = scrollHeight - clientHeight
+    }
   }
 
   useEffect(() => {
@@ -414,14 +439,13 @@ function MessagesContent() {
         (payload) => {
           const newMsg = payload.new as Message
           // If message is from current conversation, append it
-          // Use ref to check current selected, or rely on closure (selectedConversation is in dep array)
           if (selectedConversation && newMsg.sender_id === selectedConversation.id) {
             setMessages(prev => {
               if (prev.some(m => m.id === newMsg.id)) return prev
               return [...prev, newMsg]
             })
 
-            // Mark as read immediately since we are looking at it
+            // Mark as read immediately
             supabase
               .from('messages')
               .update({ is_read: true })
@@ -429,16 +453,80 @@ function MessagesContent() {
               .then(({ error }) => {
                 if (error) console.error("Failed to mark RT message read", error)
               })
-
-          } else {
-            // Increment unread count for that conversation
-            setConversations(prev => prev.map(c => {
-              if (c.id === newMsg.sender_id) {
-                return { ...c, unread_count: c.unread_count + 1 }
-              }
-              return c
-            }))
           }
+
+          // Update conversation list (last message, time, unread count)
+          setConversations((prev: any[]) => {
+            const exists = prev.find((c: any) => c.id === newMsg.sender_id)
+
+            if (exists) {
+              const updated = prev.map((c: any) => {
+                if (c.id === newMsg.sender_id) {
+                  const isCurrent = selectedConversation?.id === c.id
+                  return {
+                    ...c,
+                    last_message: newMsg.content || (newMsg.image_url ? 'Shared an image' : ''),
+                    last_message_time: newMsg.created_at,
+                    unread_count: isCurrent ? 0 : c.unread_count + 1
+                  }
+                }
+                return c
+              })
+              // Create a new sorted array to ensure re-render
+              return [...updated].sort((a: any, b: any) => {
+                const timeA = a.last_message_time ? new Date(a.last_message_time).getTime() : 0
+                const timeB = b.last_message_time ? new Date(b.last_message_time).getTime() : 0
+                return timeB - timeA
+              })
+            } else {
+              // Determine if we need to fetch user details to add to list
+              // Since we can't easily validly fetch async inside this sync state update, 
+              // we should trigger a fetch effect or just ignore for now if not friend.
+              // But user expects it. Let's try to fetch sender info outside.
+
+              // We'll return prev for now, and trigger a separate effect/fetch
+              return prev
+            }
+          })
+
+          // Check if we need to fetch new conversation
+          // This is a bit side-effecty but valid in the callback
+          const checkAndFetchNewConversation = async () => {
+            // We can't access 'conversations' state directly here reliably without closure staleness,
+            // but we can query DB
+
+            // Actually, simplest is to check if we can fetch this sender profile
+            const { data: senderProfile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', newMsg.sender_id)
+              .single()
+
+            if (senderProfile) {
+              setConversations(prev => {
+                if (prev.find(c => c.id === newMsg.sender_id)) return prev
+
+                // Generate a deterministic color based on ID
+                const colors = ['from-blue-500 to-cyan-500', 'from-purple-500 to-pink-500', 'from-green-500 to-emerald-500', 'from-orange-500 to-red-500', 'from-yellow-500 to-orange-500']
+                const colorIndex = senderProfile.id.charCodeAt(0) % colors.length
+
+                const newConv: Conversation = {
+                  id: senderProfile.id,
+                  username: senderProfile.username,
+                  display_name: senderProfile.display_name,
+                  avatar_url: senderProfile.avatar_url,
+                  avatar_color: colors[colorIndex],
+                  last_message: newMsg.content || (newMsg.image_url ? 'Shared an image' : ''),
+                  last_message_time: newMsg.created_at,
+                  unread_count: 1
+                }
+                return [newConv, ...prev]
+              })
+            }
+          }
+
+          // We can call this without awaiting
+          checkAndFetchNewConversation()
         }
 
       )
@@ -453,14 +541,33 @@ function MessagesContent() {
         (payload) => {
           // Also listen to my own sent messages if sent from another tab/device
           const newMsg = payload.new as Message
-          if (newMsg.recipient_id === selectedConversation.id) {
-            // Check if we already added it optimistically to avoid dupe? 
-            // For simplicity, we can rely on optimism or dedupe by ID.
+          if (newMsg.recipient_id === selectedConversation?.id) {
             setMessages(prev => {
               if (prev.some(m => m.id === newMsg.id)) return prev
               return [...prev, newMsg]
             })
           }
+
+          // Update conversation list for sent message
+          setConversations((prev: any[]) => {
+            const updated = prev.map((c: any) => {
+              if (c.id === newMsg.recipient_id) {
+                return {
+                  ...c,
+                  last_message: newMsg.content || (newMsg.image_url ? 'Shared an image' : ''),
+                  last_message_time: newMsg.created_at,
+                  // Don't change unread count for sent messages
+                }
+              }
+              return c
+            })
+            // Create a new sorted array
+            return [...updated].sort((a: any, b: any) => {
+              const timeA = a.last_message_time ? new Date(a.last_message_time).getTime() : 0
+              const timeB = b.last_message_time ? new Date(b.last_message_time).getTime() : 0
+              return timeB - timeA
+            })
+          })
         }
       )
       .subscribe((status) => {
@@ -514,7 +621,7 @@ function MessagesContent() {
 
     setSending(true)
     const content = newMessage.trim()
-    let imageUrl = null
+    let imageUrl: string | null = null
 
     // Create optimistic message
     const tempId = Math.random().toString()
@@ -582,6 +689,25 @@ function MessagesContent() {
           }
           return prev.map(m => m.id === tempId ? data : m)
         })
+
+        // Update conversation list
+        setConversations((prev: any[]) => {
+          const updated = prev.map((c: any) => {
+            if (c.id === selectedConversation.id) {
+              return {
+                ...c,
+                last_message: content || (imageUrl ? 'Shared an image' : ''),
+                last_message_time: data.created_at
+              }
+            }
+            return c
+          })
+          return [...updated].sort((a: any, b: any) => {
+            const timeA = a.last_message_time ? new Date(a.last_message_time).getTime() : 0
+            const timeB = b.last_message_time ? new Date(b.last_message_time).getTime() : 0
+            return timeB - timeA
+          })
+        })
       }
 
       removeSelectedImage()
@@ -620,32 +746,7 @@ function MessagesContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/80 backdrop-blur">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="text-slate-400 hover:text-white flex items-center text-sm transition-colors">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Back</span>
-            </Link>
-            <Link href="/dashboard" className="text-2xl font-bold bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 bg-clip-text text-transparent">
-              INSPHERE
-            </Link>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard">
-              <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white">
-                Dashboard
-              </Button>
-            </Link>
-            <Link href="/community">
-              <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white">
-                Community
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </nav>
+
 
       {/* Main Chat Interface */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 h-[calc(100vh-120px)] flex gap-4">
@@ -663,6 +764,7 @@ function MessagesContent() {
           pendingRequestsCount={pendingRequestsCount}
           filteredConversations={filteredConversations}
           router={router}
+          supabase={supabase}
         />
 
         {/* Chat Area */}
@@ -737,7 +839,10 @@ function MessagesContent() {
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              <div
+                ref={messageContainerRef}
+                className="flex-1 overflow-y-auto p-4 space-y-3 scroll-smooth"
+              >
                 {messages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-slate-500 opacity-50">
                     <MessageCircle className="w-12 h-12 mb-2" />
@@ -774,7 +879,6 @@ function MessagesContent() {
                     </div>
                   ))
                 )}
-                <div ref={messagesEndRef} />
               </div>
 
               {/* Input */}

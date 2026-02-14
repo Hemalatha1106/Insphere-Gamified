@@ -16,14 +16,14 @@ A gamified social platform for tracking competitive programming progress across 
 - **Badges**: Earn unique badges for milestones (e.g., "Century Club", "Streak Master").
 - **Levels & XP**: Gain XP for every problem solved and level up your profile.
 
-### 💬 Social & Community
-- **Direct Messaging**: Real-time chat with friends, featuring **Emoji support**, accurate local timestamps, unread indicators, and toast notifications.
-- **Friend System**: 
-    - **Real-time Search**: Find users instantly with debounced search.
-    - **Request Management**: Send, receive, accept, reject, and cancel friend requests.
-    - **Profile Viewing**: View full profiles of users before connecting.
-- **Notifications**: Real-time alerts for accepted friend requests and messages.
-- **Community Channels**: Dedicated spaces for discussion and doubts with a **resizable layout** (drag to adjust leaderboard/chat width).
+- **Real-time Messaging**: 
+    - **Instant Updates**: Messages appear instantly without page refresh, with conversations automatically jumping to the top.
+    - **Robust Notifications**: Global unread badge in the navbar updates in real-time.
+    - **Mark All as Read**: Ability to quickly clear all unread messages from the sidebar.
+    - **Dynamic List**: Automatically fetches and adds new conversations from non-friends when they message you.
+- **Community Hub**: 
+    - **Interactive Cards**: Discover discussions, events, and announcements via dynamic community cards.
+    - **Real-time Stats**: View active member counts and topics.
 
 ### ⚙️ Account Management
 - **Delete Profile**: Secure "Danger Zone" to permanently delete your account and data.

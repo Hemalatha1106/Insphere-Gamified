@@ -152,17 +152,17 @@ export function ProfileCard({ user, profile, isOwnProfile = true, badges = [], e
 
       {profile?.banner_url ? (
         <div
-          className="absolute top-0 left-0 right-0 h-32 bg-cover bg-center"
+          className="absolute top-0 left-0 right-0 h-40 bg-cover bg-center"
           style={{ backgroundImage: `url(${profile.banner_url})` }}
         >
           <div className="absolute inset-0 bg-black/20"></div> {/* Overlay for readability */}
         </div>
       ) : (
-        <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-r from-violet-600 via-fuchsia-600 to-pink-600 opacity-90"></div>
+        <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-r from-violet-600 via-fuchsia-600 to-pink-600 opacity-90"></div>
       )}
 
       {/* Content Container */}
-      <div className="relative pt-16 px-6 pb-6">
+      <div className="relative pt-28 px-6 pb-6">
 
         {/* Header Section with Avatar */}
         <div className="flex flex-col md:flex-row gap-4 items-start md:items-end mb-6">

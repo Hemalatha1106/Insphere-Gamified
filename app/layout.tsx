@@ -22,6 +22,7 @@ export const viewport: Viewport = {
 }
 
 import { Toaster } from "@/components/ui/toaster"
+import { GlobalNavbar } from "@/components/global-navbar"
 
 export default function RootLayout({
   children,
@@ -31,6 +32,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth">
       <body className={`${inter.variable} ${jetbrains.variable} font-sans bg-slate-950 text-slate-100 antialiased`}>
+        <GlobalNavbar />
         {children}
         <Toaster />
       </body>

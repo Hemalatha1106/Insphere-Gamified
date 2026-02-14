@@ -44,7 +44,6 @@ export default function DashboardPage() {
   const [badges, setBadges] = useState<any[]>([])
   const [earnedBadgeIds, setEarnedBadgeIds] = useState<string[]>([])
   const [leaderboard, setLeaderboard] = useState<any[]>([])
-  const [unreadMessageCount, setUnreadMessageCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
@@ -102,67 +101,6 @@ export default function DashboardPage() {
         }
 
         setUser(authUser)
-
-        // Fetch unread messages count
-        const { count, error: countError } = await supabase
-          .from('messages')
-          .select('*', { count: 'exact', head: true })
-          .eq('recipient_id', authUser.id)
-          .eq('is_read', false)
-
-        if (!countError && count !== null) {
-          setUnreadMessageCount(count)
-        }
-
-        // Subscribe to new messages
-        const channel = supabase
-          .channel('dashboard_messages')
-          .on(
-            'postgres_changes',
-            {
-              event: 'INSERT',
-              schema: 'public',
-              table: 'messages',
-              filter: `recipient_id=eq.${authUser.id}`,
-            },
-            (payload) => {
-              setUnreadMessageCount((prev) => prev + 1)
-
-              const newMessage = payload.new as any
-              // Fetch sender details for toast
-              supabase
-                .from('profiles')
-                .select('display_name, username')
-                .eq('id', newMessage.sender_id)
-                .single()
-                .then(({ data: sender }) => {
-                  if (sender) {
-                    toast({
-                      title: `New message from ${sender.display_name}`,
-                      description: newMessage.content.length > 50
-                        ? newMessage.content.substring(0, 50) + '...'
-                        : newMessage.content,
-                    })
-                  }
-                })
-            }
-          )
-          .on(
-            'postgres_changes',
-            {
-              event: 'UPDATE',
-              schema: 'public',
-              table: 'messages',
-              filter: `recipient_id=eq.${authUser.id}`,
-            },
-            (payload: any) => {
-              // If message marked as read, decrement
-              if (payload.old.is_read === false && payload.new.is_read === true) {
-                setUnreadMessageCount((prev) => Math.max(0, prev - 1))
-              }
-            }
-          )
-          .subscribe()
 
         // Fetch profile
         let { data: profileData, error: profileError } = await supabase
@@ -250,7 +188,7 @@ export default function DashboardPage() {
         }
 
         return () => {
-          supabase.removeChannel(channel)
+          // Cleanup subscriptions if any
         }
 
       } catch (err: any) {
@@ -304,37 +242,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/80 backdrop-blur">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <Link href="/dashboard" className="text-2xl font-bold bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 bg-clip-text text-transparent">
-            INSPHERE
-          </Link>
 
-          <div className="flex items-center gap-3">
-            <Link href="/community">
-              <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white">
-                <Users className="w-4 h-4 mr-2" />
-                Community
-              </Button>
-            </Link>
-            <Link href="/messages">
-              <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white relative">
-                <MessageSquare className="w-4 h-4 mr-2" />
-                Messages
-                {unreadMessageCount > 0 && (
-                  <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500 ring-2 ring-slate-950 animate-pulse" />
-                )}
-              </Button>
-            </Link>
-
-            <NotificationsPopover />
-
-            {/* User Dropdown */}
-            {user && <UserNav user={user} profile={profile} />}
-          </div>
-        </div>
-      </nav>
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

@@ -142,26 +142,7 @@ export default function BadgesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/80 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <Link href="/dashboard" className="text-2xl font-bold bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 bg-clip-text text-transparent">
-            INSPHERE
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard">
-              <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white">
-                Dashboard
-              </Button>
-            </Link>
-            <Link href="/leaderboard">
-              <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white">
-                Leaderboard
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </nav>
+
 
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -194,11 +175,10 @@ export default function BadgesPage() {
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-lg font-medium transition ${
-                selectedCategory === cat
+              className={`px-4 py-2 rounded-lg font-medium transition ${selectedCategory === cat
                   ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
                   : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
+                }`}
             >
               {cat === 'all' ? 'All Badges' : cat.charAt(0).toUpperCase() + cat.slice(1)}
             </button>
@@ -212,11 +192,10 @@ export default function BadgesPage() {
             return (
               <div
                 key={badge.id}
-                className={`relative group rounded-lg p-6 text-center transition transform hover:scale-105 ${
-                  isEarned
+                className={`relative group rounded-lg p-6 text-center transition transform hover:scale-105 ${isEarned
                     ? 'bg-gradient-to-br from-purple-600/40 to-pink-600/40 border border-purple-400/50 shadow-lg shadow-purple-500/20'
                     : 'bg-slate-700/50 border border-slate-600'
-                }`}
+                  }`}
               >
                 {/* Badge Icon */}
                 <div className="text-5xl mb-3 group-hover:scale-110 transition">{BADGE_EMOJIS[badge.category] || '🎖️'}</div>
