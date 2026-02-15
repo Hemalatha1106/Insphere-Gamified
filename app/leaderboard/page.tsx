@@ -164,9 +164,10 @@ export default function LeaderboardPage() {
             {leaderboard.map((entry, index) => {
               const rank = index + 1
               return (
-                <div
+                <Link
                   key={entry.id}
-                  className="grid grid-cols-12 gap-4 p-4 border-b border-slate-700 hover:bg-slate-700/30 transition group cursor-pointer"
+                  href={`/profile/${entry.id}`}
+                  className="grid grid-cols-12 gap-4 p-4 border-b border-slate-700 hover:bg-slate-700/30 transition group cursor-pointer block no-underline"
                 >
                   {/* Rank */}
                   <div className="col-span-1 flex items-center justify-center">
@@ -216,7 +217,7 @@ export default function LeaderboardPage() {
                       <p className="text-xs text-slate-500">Lvl</p>
                     </div>
                   </div>
-                </div>
+                </Link>
               )
             })}
           </div>

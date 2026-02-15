@@ -127,12 +127,28 @@ export function FriendRequestsList({ currentUserId }: { currentUserId: string })
         setActioning(requestId)
         try {
             if (action === 'accept') {
-                const { error } = await supabase
+                // 1. Update friend request status
+                const { error: updateError } = await supabase
                     .from('friend_requests')
                     .update({ status: 'accepted' })
                     .eq('id', requestId)
 
-                if (error) throw error
+                if (updateError) throw updateError
+
+                // 2. Automatically follow each other
+                // Use upsert with ignoreDuplicates to handle existing follows gracefully
+                const { error: followError } = await supabase
+                    .from('follows')
+                    .upsert([
+                        { follower_id: currentUserId, following_id: request?.sender_id },
+                        { follower_id: request?.sender_id, following_id: currentUserId }
+                    ], { onConflict: 'follower_id,following_id', ignoreDuplicates: true })
+
+                if (followError) {
+                    console.error('Error auto-following:', followError)
+                    // We don't throw here to avoid failing the friend acceptance if follow fails
+                    toast.error('Friend accepted, but auto-follow failed')
+                }
 
                 // Send Notification
                 if (request) {

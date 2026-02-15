@@ -373,7 +373,7 @@ export default function CommunityClassroomPage() {
 
             {/* Content */}
             <div className="flex-1 overflow-hidden w-full">
-                <div className="max-w-7xl mx-auto h-full p-4 md:p-6">
+                <div className="max-w-7xl mx-auto h-full">
                     {isMember ? (
                         <div className="flex h-full gap-4">
                             {/* 1. Left Sidebar: Channels */}

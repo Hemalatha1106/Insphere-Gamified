@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
 const jetbrains = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' })
 
 export const metadata: Metadata = {
-  title: 'Insphere - Competitive Programming Platform',
+  title: 'Insphere - Competitive Programming Tracking & Community Platform',
   description: 'Gamified platform for tracking LeetCode, GeeksforGeeks, Codeforces, and GitHub profiles with community features',
   keywords: ['competitive programming', 'leetcode', 'codeforces', 'gamification', 'community'],
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://insphere-gamified.vercel.app'),
