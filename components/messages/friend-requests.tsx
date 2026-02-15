@@ -3,6 +3,7 @@
 
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Check, X, Loader2, User, ArrowRight, UserMinus } from 'lucide-react'
@@ -30,6 +31,7 @@ interface FriendRequest {
 }
 
 export function FriendRequestsList({ currentUserId }: { currentUserId: string }) {
+    const router = useRouter()
     const [requests, setRequests] = useState<FriendRequest[]>([])
     const [sentRequests, setSentRequests] = useState<FriendRequest[]>([])
     const [loading, setLoading] = useState(true)
@@ -206,8 +208,8 @@ export function FriendRequestsList({ currentUserId }: { currentUserId: string })
                 <button
                     onClick={() => setActiveTab('received')}
                     className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-all ${activeTab === 'received'
-                            ? 'bg-slate-700 text-white shadow-sm'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                        ? 'bg-slate-700 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                         }`}
                 >
                     Received
@@ -220,8 +222,8 @@ export function FriendRequestsList({ currentUserId }: { currentUserId: string })
                 <button
                     onClick={() => setActiveTab('sent')}
                     className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-all ${activeTab === 'sent'
-                            ? 'bg-slate-700 text-white shadow-sm'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                        ? 'bg-slate-700 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                         }`}
                 >
                     Sent
@@ -239,7 +241,11 @@ export function FriendRequestsList({ currentUserId }: { currentUserId: string })
                         <div className="text-center p-6 text-slate-500 text-sm">No pending requests</div>
                     ) : (
                         requests.map(req => (
-                            <div key={req.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-800/50 border border-slate-700">
+                            <div
+                                key={req.id}
+                                onClick={() => router.push(`/profile/${req.sender.id}`)}
+                                className="flex items-center justify-between p-3 rounded-lg bg-slate-800/50 border border-slate-700 cursor-pointer hover:bg-slate-700/50 transition-colors group"
+                            >
                                 <div className="flex items-center gap-3">
                                     <Avatar className="h-10 w-10 border border-slate-600">
                                         <AvatarImage src={req.sender.avatar_url || undefined} />
@@ -248,7 +254,7 @@ export function FriendRequestsList({ currentUserId }: { currentUserId: string })
                                         </AvatarFallback>
                                     </Avatar>
                                     <div>
-                                        <p className="text-sm font-medium text-white">{req.sender.display_name}</p>
+                                        <p className="text-sm font-medium text-white group-hover:text-purple-400 transition-colors">{req.sender.display_name}</p>
                                         <p className="text-xs text-slate-400">@{req.sender.username}</p>
                                     </div>
                                 </div>
@@ -257,7 +263,10 @@ export function FriendRequestsList({ currentUserId }: { currentUserId: string })
                                         size="sm"
                                         variant="default"
                                         className="h-8 bg-green-600 hover:bg-green-700 text-white"
-                                        onClick={() => handleAction(req.id, 'accept', req)}
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleAction(req.id, 'accept', req)
+                                        }}
                                         disabled={!!actioning}
                                     >
                                         {actioning === req.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-4 h-4" />}
@@ -266,7 +275,10 @@ export function FriendRequestsList({ currentUserId }: { currentUserId: string })
                                         size="sm"
                                         variant="destructive"
                                         className="h-8"
-                                        onClick={() => handleAction(req.id, 'reject')}
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleAction(req.id, 'reject')
+                                        }}
                                         disabled={!!actioning}
                                     >
                                         <X className="w-4 h-4" />
@@ -280,7 +292,11 @@ export function FriendRequestsList({ currentUserId }: { currentUserId: string })
                         <div className="text-center p-6 text-slate-500 text-sm">No sent requests</div>
                     ) : (
                         sentRequests.map(req => (
-                            <div key={req.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-800/50 border border-slate-700">
+                            <div
+                                key={req.id}
+                                onClick={() => router.push(`/profile/${req.receiver.id}`)}
+                                className="flex items-center justify-between p-3 rounded-lg bg-slate-800/50 border border-slate-700 cursor-pointer hover:bg-slate-700/50 transition-colors group"
+                            >
                                 <div className="flex items-center gap-3">
                                     <Avatar className="h-10 w-10 border border-slate-600">
                                         <AvatarImage src={req.receiver.avatar_url || undefined} />
@@ -289,7 +305,7 @@ export function FriendRequestsList({ currentUserId }: { currentUserId: string })
                                         </AvatarFallback>
                                     </Avatar>
                                     <div>
-                                        <p className="text-sm font-medium text-white">{req.receiver.display_name}</p>
+                                        <p className="text-sm font-medium text-white group-hover:text-purple-400 transition-colors">{req.receiver.display_name}</p>
                                         <p className="text-xs text-slate-400">@{req.receiver.username}</p>
                                     </div>
                                 </div>
@@ -297,7 +313,10 @@ export function FriendRequestsList({ currentUserId }: { currentUserId: string })
                                     size="sm"
                                     variant="ghost"
                                     className="h-8 text-slate-400 hover:text-red-400 hover:bg-slate-700/50"
-                                    onClick={() => cancelRequest(req.id)}
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        cancelRequest(req.id)
+                                    }}
                                     disabled={!!actioning}
                                 >
                                     {actioning === req.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserMinus className="w-4 h-4 mr-2" />}

@@ -29,6 +29,7 @@ interface Profile {
     display_name: string
     bio: string
     avatar_url: string
+    banner_url: string | null
     leetcode_username: string
     geeksforgeeks_username: string
     codeforces_username: string
@@ -215,14 +216,12 @@ export default function PublicProfilePage() {
 
                 {/* Profile Card Ref for Download */}
                 {/* Print styles applied here to make it full page */}
-                <div ref={profileRef} className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl p-8 print:p-8 print:border-0 print:shadow-none print:bg-white print:text-black print:absolute print:top-0 print:left-0 print:w-full print:m-0">
+                <div ref={profileRef} className="relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl print:p-8 print:border-0 print:shadow-none print:bg-white print:text-black print:absolute print:top-0 print:left-0 print:w-full print:m-0">
                     <style type="text/css" media="print">
                         {`
                             @media print {
                                 body {
                                     visibility: hidden;
-                                    -webkit-print-color-adjust: exact;
-                                    print-color-adjust: exact;
                                 }
                                 /* Hide everything in body */
                                 body * {
@@ -230,211 +229,251 @@ export default function PublicProfilePage() {
                                 }
                                 /* Show only the profile card and its children */
                                 .print\\:absolute, .print\\:absolute * {
-                                    visibility: visible;
+                                    visibility: visible !important;
                                 }
                                 .print\\:absolute {
-                                    position: absolute;
-                                    left: 0;
-                                    top: 0;
-                                    width: 100%;
-                                    margin: 0;
+                                    position: absolute !important;
+                                    left: 0 !important;
+                                    top: 0 !important;
+                                    width: 100% !important;
+                                    margin: 0 !important;
+                                    padding: 1.5rem !important; /* Reduced padding to ensure fit */
+                                    background-color: #0f172a !important; /* Force slate-900 bg */
+                                    color: white !important;
+                                    border: none !important; /* Remove border for cleaner print */
+                                    box-shadow: none !important;
+                                    
+                                    /* Ensure single page */
+                                    page-break-inside: avoid !important;
+                                    break-inside: avoid !important;
+                                    height: auto !important;
+                                    min-height: 100vh !important;
                                 }
                                 @page {
                                     size: auto;
-                                    margin: 0mm;
+                                    margin: 0mm; /* Use 0 margin to fully control via padding */
                                 }
-                                .print\\:text-black { color: black !important; }
-                                .print\\:bg-white { background-color: white !important; }
+                                /* Force background colors/images */
+                                * {
+                                    -webkit-print-color-adjust: exact !important;
+                                    print-color-adjust: exact !important;
+                                }
+                                /* Override specific print overrides that might force white/black */
+                                .print\\:text-black { color: white !important; }
+                                .print\\:bg-white { background-color: #0f172a !important; }
                                 .print\\:bg-transparent { background-color: transparent !important; }
-                                .print\\:border-gray-300 { border-color: #d1d5db !important; }
+                                .print\\:border-gray-300 { border-color: #334155 !important; }
+                                
+                                /* Hide scrollbars */
+                                ::-webkit-scrollbar {
+                                    display: none;
+                                }
                             }
                         `}
                     </style>
 
-                    {/* Header Section */}
-                    <div className="flex flex-col md:flex-row gap-8 items-start mb-10">
-                        <div className="relative">
-                            <div className="w-32 h-32 rounded-full border-4 border-slate-800 bg-slate-800 overflow-hidden shadow-xl">
-                                {profile.avatar_url ? (
-                                    <img src={profile.avatar_url} alt={profile.username} className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-slate-700 text-slate-400">
-                                        <User className="w-12 h-12" />
+                    {/* Decorative Background Pattern */}
+                    <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 print:hidden"></div>
+
+                    {profile.banner_url ? (
+                        <div
+                            className="absolute top-0 left-0 right-0 h-40 bg-cover bg-center print:hidden"
+                            style={{ backgroundImage: `url(${profile.banner_url})` }}
+                        >
+                            <div className="absolute inset-0 bg-black/20"></div>
+                        </div>
+                    ) : (
+                        <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-r from-violet-600 via-fuchsia-600 to-pink-600 opacity-90 print:hidden"></div>
+                    )}
+
+                    {/* Content Container - Added relative and padding for banner overlap */}
+                    <div className="relative pt-28 px-8 pb-8 print:p-0 print:pt-6">
+
+                        {/* Header Section */}
+                        <div className="flex flex-col md:flex-row gap-8 items-start mb-10 print:mb-6 print:gap-4">
+                            <div className="relative">
+                                <div className="w-32 h-32 rounded-full border-4 border-slate-800 bg-slate-800 overflow-hidden shadow-xl print:w-24 print:h-24">
+                                    {profile.avatar_url ? (
+                                        <img src={profile.avatar_url} alt={profile.username} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center bg-slate-700 text-slate-400">
+                                            <User className="w-12 h-12" />
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="absolute -bottom-2 -right-2 bg-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full border-4 border-slate-900 print:bottom-0 print:right-0">
+                                    Lvl {profile.level}
+                                </div>
+                            </div>
+
+                            <div className="flex-1">
+                                <h1 className="text-4xl font-bold text-white mb-2 print:text-black print:text-3xl">{profile.display_name}</h1>
+                                <p className="text-xl text-slate-400 mb-4 font-mono print:text-gray-700 print:text-lg print:mb-2">@{profile.username}</p>
+                                <p className="text-slate-300 leading-relaxed max-w-2xl mb-6 print:text-black print:text-sm print:mb-4">
+                                    {profile.bio || "No bio yet."}
+                                </p>
+
+                                <div className="flex flex-wrap gap-4 text-sm text-slate-400 print:text-black print:gap-2">
+                                    <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1 rounded-full border border-slate-700 print:border-gray-300 print:bg-transparent">
+                                        <Calendar className="w-4 h-4 print:text-black" />
+                                        <span>Joined {joinedDate}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1 rounded-full border border-slate-700 print:border-gray-300 print:bg-transparent">
+                                        <Trophy className="w-4 h-4 text-yellow-500 print:text-black" />
+                                        <span className="text-white font-medium print:text-black">{profile.total_points.toLocaleString()} Points</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1 rounded-full border border-slate-700 print:border-gray-300 print:bg-transparent">
+                                        <Code className="w-4 h-4 text-green-400 print:text-black" />
+                                        <span className="text-white font-medium print:text-black">{totalSolved} Problems Solved</span>
+                                    </div>
+                                </div>
+
+                                {/* Badges Section */}
+                                {earnedBadgeIds.length > 0 && (
+                                    <div className="mt-6 print:mt-4">
+                                        <div className="flex flex-wrap gap-2">
+                                            <TooltipProvider>
+                                                {badges
+                                                    .filter(b => earnedBadgeIds.includes(b.id))
+                                                    .slice(0, 3)
+                                                    .map(badge => (
+                                                        <Tooltip key={badge.id}>
+                                                            <TooltipTrigger asChild>
+                                                                <div className="flex items-center gap-1.5 px-2 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded-full cursor-help hover:bg-yellow-500/20 transition-colors print:border-gray-300 print:bg-transparent">
+                                                                    <span className="text-sm">
+                                                                        {{
+                                                                            achievement: '🏆',
+                                                                            contest: '🎯',
+                                                                            community: '👥',
+                                                                            level: '⭐',
+                                                                            integration: '🔗',
+                                                                            consistency: '🔥',
+                                                                        }[badge.category as string] || '🎖️'}
+                                                                    </span>
+                                                                    <span className="text-xs font-medium text-yellow-500 print:text-black">{badge.name}</span>
+                                                                </div>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <p className="font-bold">{badge.name}</p>
+                                                                <p className="text-xs text-slate-400">{badge.description}</p>
+                                                                <p className="text-xs text-yellow-500 mt-1">+{badge.points_value} pts</p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    ))}
+                                            </TooltipProvider>
+
+                                            {earnedBadgeIds.length > 3 && (
+                                                <Dialog>
+                                                    <DialogTrigger asChild>
+                                                        <div className="flex items-center justify-center px-2 py-1 bg-slate-800 rounded-full border border-slate-700 cursor-pointer hover:bg-slate-700 transition-colors print:hidden">
+                                                            <span className="text-xs text-slate-400">+{earnedBadgeIds.length - 3} more</span>
+                                                        </div>
+                                                    </DialogTrigger>
+                                                    <DialogContent className="bg-slate-900 border-slate-800 text-white sm:max-w-md">
+                                                        <DialogHeader>
+                                                            <DialogTitle>Earned Badges ({earnedBadgeIds.length})</DialogTitle>
+                                                        </DialogHeader>
+                                                        <div className="flex flex-wrap gap-2 mt-4 max-h-[60vh] overflow-y-auto p-1">
+                                                            <TooltipProvider>
+                                                                {badges
+                                                                    .filter(b => earnedBadgeIds.includes(b.id))
+                                                                    .map(badge => (
+                                                                        <Tooltip key={badge.id}>
+                                                                            <TooltipTrigger asChild>
+                                                                                <div className="flex items-center gap-1.5 px-2 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded-full cursor-help hover:bg-yellow-500/20 transition-colors">
+                                                                                    <span className="text-sm">
+                                                                                        {{
+                                                                                            achievement: '🏆',
+                                                                                            contest: '🎯',
+                                                                                            community: '👥',
+                                                                                            level: '⭐',
+                                                                                            integration: '🔗',
+                                                                                            consistency: '🔥',
+                                                                                        }[badge.category as string] || '🎖️'}
+                                                                                    </span>
+                                                                                    <span className="text-xs font-medium text-yellow-500">{badge.name}</span>
+                                                                                </div>
+                                                                            </TooltipTrigger>
+                                                                            <TooltipContent>
+                                                                                <p className="font-bold">{badge.name}</p>
+                                                                                <p className="text-xs text-slate-400">{badge.description}</p>
+                                                                                <p className="text-xs text-yellow-500 mt-1">+{badge.points_value} pts</p>
+                                                                            </TooltipContent>
+                                                                        </Tooltip>
+                                                                    ))}
+                                                            </TooltipProvider>
+                                                        </div>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>
-                            <div className="absolute -bottom-2 -right-2 bg-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full border-4 border-slate-900">
-                                Lvl {profile.level}
-                            </div>
                         </div>
 
-                        <div className="flex-1">
-                            <h1 className="text-4xl font-bold text-white mb-2 print:text-black">{profile.display_name}</h1>
-                            <p className="text-xl text-slate-400 mb-4 font-mono print:text-gray-700">@{profile.username}</p>
-                            <p className="text-slate-300 leading-relaxed max-w-2xl mb-6 print:text-black">
-                                {profile.bio || "No bio yet."}
-                            </p>
+                        <div className="border-t border-slate-800 my-8 print:my-4" />
 
-                            <div className="flex flex-wrap gap-4 text-sm text-slate-400 print:text-black">
-                                <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1 rounded-full border border-slate-700 print:border-gray-300 print:bg-transparent">
-                                    <Calendar className="w-4 h-4 print:text-black" />
-                                    <span>Joined {joinedDate}</span>
-                                </div>
-                                <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1 rounded-full border border-slate-700 print:border-gray-300 print:bg-transparent">
-                                    <Trophy className="w-4 h-4 text-yellow-500 print:text-black" />
-                                    <span className="text-white font-medium print:text-black">{profile.total_points.toLocaleString()} Points</span>
-                                </div>
-                                <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1 rounded-full border border-slate-700 print:border-gray-300 print:bg-transparent">
-                                    <Code className="w-4 h-4 text-green-400 print:text-black" />
-                                    <span className="text-white font-medium print:text-black">{totalSolved} Problems Solved</span>
-                                </div>
-                            </div>
-
-                            {/* Badges Section */}
-                            {earnedBadgeIds.length > 0 && (
-                                <div className="mt-6">
-                                    <div className="flex flex-wrap gap-2">
-                                        <TooltipProvider>
-                                            {badges
-                                                .filter(b => earnedBadgeIds.includes(b.id))
-                                                .slice(0, 3)
-                                                .map(badge => (
-                                                    <Tooltip key={badge.id}>
-                                                        <TooltipTrigger asChild>
-                                                            <div className="flex items-center gap-1.5 px-2 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded-full cursor-help hover:bg-yellow-500/20 transition-colors print:border-gray-300 print:bg-transparent">
-                                                                <span className="text-sm">
-                                                                    {{
-                                                                        achievement: '🏆',
-                                                                        contest: '🎯',
-                                                                        community: '👥',
-                                                                        level: '⭐',
-                                                                        integration: '🔗',
-                                                                        consistency: '🔥',
-                                                                    }[badge.category as string] || '🎖️'}
-                                                                </span>
-                                                                <span className="text-xs font-medium text-yellow-500 print:text-black">{badge.name}</span>
-                                                            </div>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            <p className="font-bold">{badge.name}</p>
-                                                            <p className="text-xs text-slate-400">{badge.description}</p>
-                                                            <p className="text-xs text-yellow-500 mt-1">+{badge.points_value} pts</p>
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                ))}
-                                        </TooltipProvider>
-
-                                        {earnedBadgeIds.length > 3 && (
-                                            <Dialog>
-                                                <DialogTrigger asChild>
-                                                    <div className="flex items-center justify-center px-2 py-1 bg-slate-800 rounded-full border border-slate-700 cursor-pointer hover:bg-slate-700 transition-colors print:hidden">
-                                                        <span className="text-xs text-slate-400">+{earnedBadgeIds.length - 3} more</span>
-                                                    </div>
-                                                </DialogTrigger>
-                                                <DialogContent className="bg-slate-900 border-slate-800 text-white sm:max-w-md">
-                                                    <DialogHeader>
-                                                        <DialogTitle>Earned Badges ({earnedBadgeIds.length})</DialogTitle>
-                                                    </DialogHeader>
-                                                    <div className="flex flex-wrap gap-2 mt-4 max-h-[60vh] overflow-y-auto p-1">
-                                                        <TooltipProvider>
-                                                            {badges
-                                                                .filter(b => earnedBadgeIds.includes(b.id))
-                                                                .map(badge => (
-                                                                    <Tooltip key={badge.id}>
-                                                                        <TooltipTrigger asChild>
-                                                                            <div className="flex items-center gap-1.5 px-2 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded-full cursor-help hover:bg-yellow-500/20 transition-colors">
-                                                                                <span className="text-sm">
-                                                                                    {{
-                                                                                        achievement: '🏆',
-                                                                                        contest: '🎯',
-                                                                                        community: '👥',
-                                                                                        level: '⭐',
-                                                                                        integration: '🔗',
-                                                                                        consistency: '🔥',
-                                                                                    }[badge.category as string] || '🎖️'}
-                                                                                </span>
-                                                                                <span className="text-xs font-medium text-yellow-500">{badge.name}</span>
-                                                                            </div>
-                                                                        </TooltipTrigger>
-                                                                        <TooltipContent>
-                                                                            <p className="font-bold">{badge.name}</p>
-                                                                            <p className="text-xs text-slate-400">{badge.description}</p>
-                                                                            <p className="text-xs text-yellow-500 mt-1">+{badge.points_value} pts</p>
-                                                                        </TooltipContent>
-                                                                    </Tooltip>
-                                                                ))}
-                                                        </TooltipProvider>
-                                                    </div>
-                                                </DialogContent>
-                                            </Dialog>
-                                        )}
+                        {/* Stats Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10 print:mb-6 print:grid-cols-4 print:gap-2">
+                            {codingStats.length > 0 ? codingStats.map(stat => (
+                                <div key={stat.platform} className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-5 print:p-3">
+                                    <div className="flex items-center justify-between mb-3 print:mb-1">
+                                        <h3 className="text-slate-400 font-medium capitalize print:text-xs">{stat.platform}</h3>
+                                        {stat.platform === 'leetcode' && <Code className="w-5 h-5 text-yellow-500 print:w-4 print:h-4" />}
+                                        {stat.platform === 'github' && <Github className="w-5 h-5 text-white print:w-4 print:h-4" />}
+                                        {stat.platform === 'codeforces' && <Terminal className="w-5 h-5 text-blue-400 print:w-4 print:h-4" />}
+                                        {stat.platform === 'geeksforgeeks' && <Globe className="w-5 h-5 text-green-500 print:w-4 print:h-4" />}
                                     </div>
+                                    <div className="flex items-end gap-2">
+                                        <span className="text-2xl font-bold text-white print:text-lg">{stat.problems_solved}</span>
+                                        <span className="text-xs text-slate-500 mb-1">solved</span>
+                                    </div>
+                                </div>
+                            )) : (
+                                <div className="col-span-4 text-center py-4 text-slate-500">
+                                    No coding stats connected.
                                 </div>
                             )}
                         </div>
-                    </div>
 
-                    <div className="border-t border-slate-800 my-8" />
-
-                    {/* Stats Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-                        {codingStats.length > 0 ? codingStats.map(stat => (
-                            <div key={stat.platform} className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-5">
-                                <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-slate-400 font-medium capitalize">{stat.platform}</h3>
-                                    {stat.platform === 'leetcode' && <Code className="w-5 h-5 text-yellow-500" />}
-                                    {stat.platform === 'github' && <Github className="w-5 h-5 text-white" />}
-                                    {stat.platform === 'codeforces' && <Terminal className="w-5 h-5 text-blue-400" />}
-                                    {stat.platform === 'geeksforgeeks' && <Globe className="w-5 h-5 text-green-500" />}
+                        {/* LeetCode Heatmap */}
+                        {codingStats.find(s => s.platform === 'leetcode' && s.heatmap_data) && (
+                            <div className="mb-10 print:mb-6">
+                                <div className="flex items-center gap-2 mb-4 print:mb-2">
+                                    <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                                    <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider print:text-gray-500">LeetCode Activity</h3>
                                 </div>
-                                <div className="flex items-end gap-2">
-                                    <span className="text-2xl font-bold text-white">{stat.problems_solved}</span>
-                                    <span className="text-xs text-slate-500 mb-1">solved</span>
+                                <div className="bg-slate-950/50 rounded-lg p-4 border border-slate-800 overflow-hidden print:bg-transparent print:border-gray-200 print:p-2">
+                                    <LeetCodeHeatmap heatmapData={codingStats.find(s => s.platform === 'leetcode')?.heatmap_data} />
                                 </div>
-                            </div>
-                        )) : (
-                            <div className="col-span-4 text-center py-4 text-slate-500">
-                                No coding stats connected.
                             </div>
                         )}
-                    </div>
 
-                    {/* LeetCode Heatmap */}
-                    {codingStats.find(s => s.platform === 'leetcode' && s.heatmap_data) && (
-                        <div className="mb-10">
-                            <div className="flex items-center gap-2 mb-4">
-                                <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
-                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider print:text-gray-500">LeetCode Activity</h3>
-                            </div>
-                            <div className="bg-slate-950/50 rounded-lg p-4 border border-slate-800 overflow-hidden print:bg-transparent print:border-gray-200">
-                                <LeetCodeHeatmap heatmapData={codingStats.find(s => s.platform === 'leetcode')?.heatmap_data} />
-                            </div>
+                        {/* Footer Links (Live in HTML, visible in image) */}
+                        <div className="flex flex-wrap justify-center gap-4 print:gap-2 print:text-xs">
+                            {profile.leetcode_username && (
+                                <a href={`https://leetcode.com/${profile.leetcode_username}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
+                                    <Code className="w-4 h-4" /> leetcode.com/{profile.leetcode_username}
+                                </a>
+                            )}
+                            {profile.github_username && (
+                                <a href={`https://github.com/${profile.github_username}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
+                                    <Github className="w-4 h-4" /> github.com/{profile.github_username}
+                                </a>
+                            )}
+                            {profile.geeksforgeeks_username && (
+                                <a href={`https://www.geeksforgeeks.org/user/${profile.geeksforgeeks_username}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
+                                    <Globe className="w-4 h-4" /> geeksforgeeks.org/{profile.geeksforgeeks_username}
+                                </a>
+                            )}
+                            {profile.linkedin_username && (
+                                <a href={profile.linkedin_username.startsWith('http') ? profile.linkedin_username : `https://linkedin.com/in/${profile.linkedin_username}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
+                                    <Linkedin className="w-4 h-4" /> linkedin.com/in/{profile.linkedin_username}
+                                </a>
+                            )}
                         </div>
-                    )}
-
-                    {/* Footer Links (Live in HTML, visible in image) */}
-                    <div className="flex flex-wrap justify-center gap-4">
-                        {profile.leetcode_username && (
-                            <a href={`https://leetcode.com/${profile.leetcode_username}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
-                                <Code className="w-4 h-4" /> leetcode.com/{profile.leetcode_username}
-                            </a>
-                        )}
-                        {profile.github_username && (
-                            <a href={`https://github.com/${profile.github_username}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
-                                <Github className="w-4 h-4" /> github.com/{profile.github_username}
-                            </a>
-                        )}
-                        {profile.geeksforgeeks_username && (
-                            <a href={`https://www.geeksforgeeks.org/user/${profile.geeksforgeeks_username}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
-                                <Globe className="w-4 h-4" /> geeksforgeeks.org/{profile.geeksforgeeks_username}
-                            </a>
-                        )}
-                        {profile.linkedin_username && (
-                            <a href={profile.linkedin_username.startsWith('http') ? profile.linkedin_username : `https://linkedin.com/in/${profile.linkedin_username}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
-                                <Linkedin className="w-4 h-4" /> linkedin.com/in/{profile.linkedin_username}
-                            </a>
-                        )}
-                    </div>
+                    </div> {/* End of Content Container */}
                 </div>
 
                 <div className="mt-8 text-center space-y-4">
@@ -445,6 +484,6 @@ export default function PublicProfilePage() {
                     <p className="text-slate-500 text-sm">Insphere - Gamified Coding Platform</p>
                 </div>
             </div>
-        </div>
+        </div >
     )
 }

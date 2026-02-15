@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { User } from '@supabase/supabase-js'
-import { Trophy, Zap, MapPin, Calendar, Edit3, Link as LinkIcon, Github, Twitter, Linkedin, Loader2, UserPlus, UserCheck, UserMinus, MessageCircle } from 'lucide-react'
+import { Trophy, Zap, MapPin, Calendar, Edit3, Link as LinkIcon, Github, Twitter, Linkedin, Loader2, UserPlus, UserCheck, UserMinus, MessageCircle, Code, Terminal, Globe, Users } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -42,9 +42,10 @@ interface ProfileCardProps {
   badges?: Badge[]
   earnedBadgeIds?: string[]
   codingStats?: any[]
+  displayStatsAs?: 'tags' | 'boxes'
 }
 
-export function ProfileCard({ user, profile, isOwnProfile = true, badges = [], earnedBadgeIds = [], codingStats = [] }: ProfileCardProps) {
+export function ProfileCard({ user, profile, isOwnProfile = true, badges = [], earnedBadgeIds = [], codingStats = [], displayStatsAs = 'tags' }: ProfileCardProps) {
   // Use profile avatar or fallback to user metadata or initial
   const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url
   const displayName = profile?.display_name || user?.user_metadata?.display_name || 'Coder'
@@ -271,10 +272,35 @@ export function ProfileCard({ user, profile, isOwnProfile = true, badges = [], e
             )}
 
             <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-slate-400 font-medium">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2 px-3 py-1 bg-slate-800/50 border border-slate-700/50 rounded-full text-slate-300">
                 <Calendar className="w-3.5 h-3.5" />
                 <span>Joined {joinDate}</span>
               </div>
+
+              {displayStatsAs === 'tags' && (
+                <>
+                  <div className="flex items-center gap-2 px-3 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded-full text-yellow-500">
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>{profile?.total_points || 0} Points</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 px-3 py-1 bg-purple-500/10 border border-purple-500/20 rounded-full text-purple-400">
+                    <Trophy className="w-3.5 h-3.5" />
+                    <span>Lvl {profile?.level || 1}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 px-3 py-1 bg-pink-500/10 border border-pink-500/20 rounded-full text-pink-400">
+                    <Users className="w-3.5 h-3.5" />
+                    <span>{profile?.followers_count || 0} Followers</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400">
+                    <UserCheck className="w-3.5 h-3.5" />
+                    <span>{profile?.following_count || 0} Following</span>
+                  </div>
+                </>
+              )}
+
               {/* Placeholders for future location/links */}
               {/* <div className="flex items-center gap-1.5">
                  <MapPin className="w-3.5 h-3.5" />
@@ -389,55 +415,87 @@ export function ProfileCard({ user, profile, isOwnProfile = true, badges = [], e
           )}
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 transition-all hover:bg-slate-800/60 group">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-500 group-hover:scale-110 transition-transform">
-                <Zap className="w-5 h-5" />
-              </div>
-              <span className="text-sm text-slate-400 font-medium">Total Points</span>
-            </div>
-            <div className="text-2xl font-bold text-white">{profile?.total_points || 0}</div>
-          </div>
 
-          <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 transition-all hover:bg-slate-800/60 group">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-purple-500/10 rounded-lg text-purple-500 group-hover:scale-110 transition-transform">
-                <Trophy className="w-5 h-5" />
-              </div>
-              <span className="text-sm text-slate-400 font-medium">Level {profile?.level || 1}</span>
-            </div>
-            <div className="w-full bg-slate-700/50 h-1.5 rounded-full mt-1 overflow-hidden">
-              <div className="bg-gradient-to-r from-purple-500 to-pink-500 h-full rounded-full" style={{ width: `${profile?.level_progress || 0}%` }}></div>
-            </div>
-            <div className="text-xs text-slate-500 mt-1.5 text-right">{profile?.level_progress || 0}% to next level</div>
-          </div>
 
-          {/* Add more stats if needed, or placeholders */}
-          <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 transition-all hover:bg-slate-800/60 group">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500 group-hover:scale-110 transition-transform">
-                <LinkIcon className="w-5 h-5" />
-              </div>
-              <span className="text-sm text-slate-400 font-medium">Following</span>
-            </div>
-            <div className="text-2xl font-bold text-white">{profile?.following_count || 0}</div>
-          </div>
 
-          <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 transition-all hover:bg-slate-800/60 group">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-pink-500/10 rounded-lg text-pink-500 group-hover:scale-110 transition-transform">
-                <Trophy className="w-5 h-5" />
+
+        {/* Stats Boxes (if enabled) */}
+        {displayStatsAs === 'boxes' && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 transition-all hover:bg-slate-800/60 group">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-500 group-hover:scale-110 transition-transform">
+                  <Zap className="w-5 h-5" />
+                </div>
+                <span className="text-sm text-slate-400 font-medium">Total Points</span>
               </div>
-              <span className="text-sm text-slate-400 font-medium">Followers</span>
+              <div className="text-2xl font-bold text-white">{profile?.total_points || 0}</div>
             </div>
-            <div className="text-2xl font-bold text-white">{profile?.followers_count || 0}</div>
+
+            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 transition-all hover:bg-slate-800/60 group">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-purple-500/10 rounded-lg text-purple-500 group-hover:scale-110 transition-transform">
+                  <Trophy className="w-5 h-5" />
+                </div>
+                <span className="text-sm text-slate-400 font-medium">Level {profile?.level || 1}</span>
+              </div>
+              <div className="w-full bg-slate-700/50 h-1.5 rounded-full mt-1 overflow-hidden">
+                <div className="bg-gradient-to-r from-purple-500 to-pink-500 h-full rounded-full" style={{ width: `${profile?.level_progress || 0}%` }}></div>
+              </div>
+              <div className="text-xs text-slate-500 mt-1.5 text-right">{profile?.level_progress || 0}% to next level</div>
+            </div>
+
+            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 transition-all hover:bg-slate-800/60 group">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-pink-500/10 rounded-lg text-pink-500 group-hover:scale-110 transition-transform">
+                  <Trophy className="w-5 h-5" />
+                </div>
+                <span className="text-sm text-slate-400 font-medium">Followers</span>
+              </div>
+              <div className="text-2xl font-bold text-white">{profile?.followers_count || 0}</div>
+            </div>
+
+            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 transition-all hover:bg-slate-800/60 group">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500 group-hover:scale-110 transition-transform">
+                  <LinkIcon className="w-5 h-5" />
+                </div>
+                <span className="text-sm text-slate-400 font-medium">Following</span>
+              </div>
+              <div className="text-2xl font-bold text-white">{profile?.following_count || 0}</div>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Coding Stats Grid */}
+        {displayStatsAs !== 'boxes' && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            {codingStats.length > 0 ? codingStats.map(stat => (
+              <div key={stat.platform} className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 transition-all hover:bg-slate-800/60 group">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-slate-400 font-medium capitalize text-sm">{stat.platform}</h3>
+                  <div className="p-1.5 bg-slate-800 rounded-lg group-hover:scale-110 transition-transform">
+                    {stat.platform === 'leetcode' && <Code className="w-4 h-4 text-yellow-500" />}
+                    {stat.platform === 'github' && <Github className="w-4 h-4 text-white" />}
+                    {stat.platform === 'codeforces' && <Terminal className="w-4 h-4 text-blue-400" />}
+                    {stat.platform === 'geeksforgeeks' && <Globe className="w-4 h-4 text-green-500" />}
+                  </div>
+                </div>
+                <div className="flex items-end gap-2">
+                  <span className="text-2xl font-bold text-white">{stat.problems_solved}</span>
+                  <span className="text-xs text-slate-500 mb-1">solved</span>
+                </div>
+              </div>
+            )) : (
+              // Don't show empty state if no stats, checking length above handles it.
+              // But if we want a placeholder for empty:
+              null
+            )}
+          </div>
+        )}
 
         {/* LeetCode Heatmap */}
-        {codingStats.find(s => s.platform === 'leetcode' && s.heatmap_data) && (
+        {displayStatsAs !== 'boxes' && codingStats.find(s => s.platform === 'leetcode' && s.heatmap_data) && (
           <div className="mt-6 border-t border-slate-800 pt-6">
             <div className="flex items-center gap-2 mb-4">
               <span className="w-2 h-2 rounded-full bg-yellow-500"></span>

@@ -8,26 +8,25 @@ A gamified social platform for tracking competitive programming progress across 
 - **Unified Stats**: Aggregate your coding stats from LeetCode, GitHub, Codeforces, and GeeksforGeeks.
 - **LeetCode Heatmap**: Visualize your coding activity with a rolling 365-day heatmap, downloadable as part of your profile card.
 - **Shareable Card**: A dedicated public profile page (`/u/[username]`) to showcase your achievements.
-- **PDF Export**: Generate a professional, print-ready resume/CV from your profile with one click.
-- **Dynamic Avatar**: Upload custom avatars and banner images.
+- **PDF / Image Export**: Generate a professional, print-ready resume/CV or social media image from your profile with one click.
+- **Customization**: Upload custom avatars and profile banners to personalize your space.
 
-### 🏆 Gamification
-- **Leaderboards**: Compete globally or amongst friends with toggleable views.
-- **Badges**: Earn unique badges for milestones (e.g., "Century Club", "Streak Master").
+### 🤝 Social & Community
+- **Friend System**: Search for users, send friend requests, and manage connections.
+- **Follow System**: Follow users to track their progress and see their updates.
+- **Leaderboards**: Compete globally or amongst friends with toggleable views and real-time point tracking.
+- **Badges**: Earn unique badges for milestones (e.g., "Century Club", "Streak Master") and display them on your profile.
 - **Levels & XP**: Gain XP for every problem solved and level up your profile.
 
-- **Real-time Messaging**: 
-    - **Instant Updates**: Messages appear instantly without page refresh, with conversations automatically jumping to the top.
-    - **Robust Notifications**: Global unread badge in the navbar updates in real-time.
-    - **Mark All as Read**: Ability to quickly clear all unread messages from the sidebar.
-    - **Dynamic List**: Automatically fetches and adds new conversations from non-friends when they message you.
-- **Community Hub**: 
-    - **Interactive Cards**: Discover discussions, events, and announcements via dynamic community cards.
-    - **Real-time Stats**: View active member counts and topics.
+### 💬 Real-time Communication
+- **Instant Messaging**: Real-time 1-on-1 chat with friends.
+- **Community Chat**: Participate in public channels and discussions.
+- **Notifications**: Real-time alerts for friend requests, messages, and system updates.
 
 ### ⚙️ Account Management
+- **Link Accounts**: Seamlessly link your LinkedIn, GitHub, LeetCode, and other coding profiles.
 - **Delete Profile**: Secure "Danger Zone" to permanently delete your account and data.
-- **Rate Limiting**: Intelligent throttling to prevent API spamming (2-minute cooldown on updates).
+- **Rate Limiting**: Intelligent throttling to prevent API spamming.
 
 ## 🛠️ Tech Stack
 

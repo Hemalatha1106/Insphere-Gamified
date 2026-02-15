@@ -2,6 +2,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,7 @@ interface Profile {
 }
 
 export function FriendSearch({ currentUserId }: { currentUserId: string }) {
+    const router = useRouter()
     const [query, setQuery] = useState('')
     const [results, setResults] = useState<Profile[]>([])
     const [loading, setLoading] = useState(false)
@@ -129,7 +131,11 @@ export function FriendSearch({ currentUserId }: { currentUserId: string }) {
 
             <div className="space-y-2 overflow-y-auto pr-1 custom-scrollbar flex-1">
                 {results.map(user => (
-                    <div key={user.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-800/40 border border-slate-700/50 hover:bg-slate-800/60 transition-colors">
+                    <div
+                        key={user.id}
+                        onClick={() => router.push(`/profile/${user.id}`)}
+                        className="flex items-center justify-between p-3 rounded-lg bg-slate-800/40 border border-slate-700/50 hover:bg-slate-800/60 transition-colors cursor-pointer group"
+                    >
                         <div className="flex items-center gap-3 overflow-hidden">
                             <Avatar className="h-10 w-10 border border-slate-600 shrink-0">
                                 <AvatarImage src={user.avatar_url || undefined} />
@@ -138,29 +144,19 @@ export function FriendSearch({ currentUserId }: { currentUserId: string }) {
                                 </AvatarFallback>
                             </Avatar>
                             <div className="min-w-0">
-                                <p className="text-sm font-medium text-white truncate">{user.display_name}</p>
+                                <p className="text-sm font-medium text-white truncate group-hover:text-purple-400 transition-colors">{user.display_name}</p>
                                 <p className="text-xs text-slate-400 truncate">@{user.username}</p>
                             </div>
                         </div>
                         <div className="flex gap-2 shrink-0">
-                            <a
-                                href={`/u/${user.username}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                            >
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-8 px-3 text-slate-300 border-slate-600 hover:bg-slate-700 hover:text-white"
-                                >
-                                    View
-                                </Button>
-                            </a>
                             <Button
                                 size="sm"
                                 variant="secondary"
                                 disabled={sending === user.id}
-                                onClick={() => sendRequest(user.id)}
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    sendRequest(user.id)
+                                }}
                                 className="h-8 w-20 bg-purple-600 hover:bg-purple-700 text-white border-0 transition-all"
                             >
                                 {sending === user.id ? (

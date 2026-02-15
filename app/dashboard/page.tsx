@@ -255,6 +255,7 @@ export default function DashboardPage() {
               badges={badges}
               earnedBadgeIds={earnedBadgeIds}
               codingStats={codingStats}
+              displayStatsAs="boxes"
             />
           )}
         </section>
