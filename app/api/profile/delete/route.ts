@@ -40,6 +40,13 @@ export async function DELETE(request: Request) {
         // We use admin client here to bypass any potential RLS that might prevent deletion if not set up for self-delete
         await supabaseAdmin.from('coding_stats').delete().eq('user_id', user.id)
 
+        // Handle foreign key constraint on channels table
+        // The created_by column in channels references profiles(id) without ON DELETE CASCADE
+        // We need to set it to NULL explicitly before deleting the profile
+        await supabaseAdmin.from('channels')
+            .update({ created_by: null })
+            .eq('created_by', user.id)
+
         // Delete from profiles
         await supabaseAdmin.from('profiles').delete().eq('id', user.id)
 
