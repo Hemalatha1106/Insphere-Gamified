@@ -283,7 +283,7 @@ export function NotificationsPopover() {
                                                         onClick={(e) => {
                                                             e.stopPropagation()
                                                             setOpen(false)
-                                                            router.push(`/u/${item.sender?.username}`)
+                                                            router.push(`/profile/${item.metadata?.sender_id}`)
                                                         }}
                                                     >
                                                         View Profile
